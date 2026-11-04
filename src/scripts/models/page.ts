@@ -23,6 +23,7 @@ export const SHOW_OFFSET_ITEM = "SHOW_OFFSET_ITEM"
 export const DISMISS_ITEM = "DISMISS_ITEM"
 export const APPLY_FILTER = "APPLY_FILTER"
 export const TOGGLE_SEARCH = "TOGGLE_SEARCH"
+export const RESET_GROUP_VIEW = "RESET_GROUP_VIEW"
 
 export enum PageType {
     AllArticles,
@@ -39,11 +40,38 @@ interface SelectPageAction {
     sids?: number[]
     menuKey?: string
     title?: string
+    // resolved by the thunk from the per-menu-entry view preference
+    viewType?: ViewType
+    viewConfigs?: ViewConfigs
+}
+
+// The layout a sidebar entry should open with: its own saved view, or the
+// global default when it has never been changed.
+function resolveView(key: string): {
+    viewType: ViewType
+    viewConfigs: ViewConfigs
+} {
+    const saved = globalThis.settings.getGroupView(key)
+    const viewType =
+        saved === undefined ? globalThis.settings.getDefaultView() : saved
+    return {
+        viewType,
+        viewConfigs: globalThis.settings.getViewConfigs(viewType),
+    }
 }
 
 interface SwitchViewAction {
     type: typeof SWITCH_VIEW
     viewType: ViewType
+    // which sidebar entry this choice belongs to; omitted means "not remembered"
+    key?: string
+}
+
+interface ResetGroupViewAction {
+    type: typeof RESET_GROUP_VIEW
+    key: string
+    viewType: ViewType
+    viewConfigs: ViewConfigs
 }
 
 interface SetViewConfigsAction {
@@ -72,6 +100,7 @@ interface ToggleSearchAction {
 export type PageActionTypes =
     | SelectPageAction
     | SwitchViewAction
+    | ResetGroupViewAction
     | ShowItemAction
     | DismissItemAction
     | ApplyFilterAction
@@ -86,6 +115,7 @@ export function selectAllArticles(init = false): AppThunk {
             filter: getState().page.filter,
             pageType: PageType.AllArticles,
             init: init,
+            ...resolveView(ALL),
         } as PageActionTypes)
     }
 }
@@ -106,17 +136,41 @@ export function selectSources(
                 menuKey: menuKey,
                 title: title,
                 init: true,
+                ...resolveView(menuKey),
             } as PageActionTypes)
         }
     }
 }
 
 export function switchView(viewType: ViewType): AppThunk {
-    return dispatch => {
-        globalThis.settings.setDefaultView(viewType)
+    return (dispatch, getState) => {
+        const key = getState().app.menuKey || ALL
+        if (key === ALL) {
+            // "All articles" doubles as the template for entries that have never
+            // been given a view of their own.
+            globalThis.settings.setDefaultView(viewType)
+        }
+        globalThis.settings.setGroupView(key, viewType)
         dispatch({
             type: SWITCH_VIEW,
             viewType: viewType,
+            key: key,
+        })
+    }
+}
+
+// Drop this entry's own view and fall back to the global default.
+export function resetGroupView(key: string): AppThunk {
+    return dispatch => {
+        globalThis.settings.clearGroupView(key)
+        // read the default explicitly instead of re-reading the (async cleared)
+        // map, so this cannot race the clear
+        const viewType = globalThis.settings.getDefaultView()
+        dispatch({
+            type: RESET_GROUP_VIEW,
+            key: key,
+            viewType: viewType,
+            viewConfigs: globalThis.settings.getViewConfigs(viewType),
         })
     }
 }
@@ -287,15 +341,34 @@ export function performSearch(query: string): AppThunk {
 }
 
 export class PageState {
-    viewType = globalThis.settings.getDefaultView()
-    viewConfigs = globalThis.settings.getViewConfigs(
-        globalThis.settings.getDefaultView()
-    )
+    // Resolved in the constructor rather than at module scope: ALL comes from a
+    // circular import, so reading it while the bundle is still initialising hits
+    // its temporal dead zone ("Cannot access ... before initialization").
+    viewType: ViewType
+    viewConfigs: ViewConfigs
+    // menuKey -> the view that entry was last set to. Kept in the store so the
+    // sidebar can mark entries that no longer follow the global default.
+    groupViews: Record<string, ViewType> = {}
     filter = new FeedFilter()
     feedId = ALL
     itemId = null as number
     itemFromFeed = true
     searchOn = false
+
+    constructor() {
+        const view = resolveView(ALL)
+        this.viewType = view.viewType
+        this.viewConfigs = view.viewConfigs
+        this.groupViews = globalThis.settings.getAllGroupViews() || {}
+    }
+}
+
+function viewFromAction(action: SelectPageAction): Partial<PageState> {
+    if (action.viewType === undefined) return {}
+    return {
+        viewType: action.viewType,
+        viewConfigs: action.viewConfigs,
+    }
 }
 
 export function pageReducer(
@@ -310,12 +383,14 @@ export function pageReducer(
                         ...state,
                         feedId: ALL,
                         itemId: null,
+                        ...viewFromAction(action),
                     }
                 case PageType.Sources:
                     return {
                         ...state,
                         feedId: SOURCE,
                         itemId: null,
+                        ...viewFromAction(action),
                     }
                 default:
                     return state
@@ -328,7 +403,21 @@ export function pageReducer(
                     action.viewType
                 ),
                 itemId: null,
+                groupViews: action.key
+                    ? { ...state.groupViews, [action.key]: action.viewType }
+                    : state.groupViews,
             }
+        case RESET_GROUP_VIEW: {
+            const groupViews = { ...state.groupViews }
+            delete groupViews[action.key]
+            return {
+                ...state,
+                groupViews: groupViews,
+                viewType: action.viewType,
+                viewConfigs: action.viewConfigs,
+                itemId: null,
+            }
+        }
         case SET_VIEW_CONFIGS:
             return {
                 ...state,

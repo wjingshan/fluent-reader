@@ -8,6 +8,7 @@ import { useAppSelector, useAppDispatch } from "../../scripts/reducer"
 import { ViewType, ViewConfigs } from "../../schema-types"
 import CardsFeed from "./cards-feed"
 import ListFeed from "./list-feed"
+import WaterfallFeed from "./waterfall-feed"
 
 export type FeedProps = {
     feed: RSSFeed
@@ -80,6 +81,8 @@ export const Feed: React.FC<FeedOwnProps> = ({ feedId, viewType }) => {
     switch (viewType) {
         case ViewType.Cards:
             return <CardsFeed {...feedProps} />
+        case ViewType.Customized:
+            return <WaterfallFeed {...feedProps} />
         case ViewType.Magazine:
         case ViewType.Compact:
         case ViewType.List:

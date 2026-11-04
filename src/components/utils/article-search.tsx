@@ -43,13 +43,13 @@ const useStyles = makeStyles({
         },
     },
     floatingMenu: {
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             left: "280px",
             maxWidth: "calc(100% - 728px)",
         },
     },
     floatingDarwinMenu: {
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             "left": "280px",
             "maxWidth": "calc(100% - 556px)",
             "&:is(body.not-fullscreen *)": {

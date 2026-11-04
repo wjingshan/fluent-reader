@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useMemo, useCallback, useEffect, useRef, useState } from "react"
 import intl from "react-intl-universal"
-import { SourceGroup } from "../schema-types"
+import { SourceGroup, ViewType } from "../schema-types"
 import { RSSSource } from "../scripts/models/source"
 import { ALL, initFeeds } from "../scripts/models/feed"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
@@ -38,6 +38,15 @@ import { useArticleOverlayOpen } from "./utils/hooks/useArticleOverlayOpen"
 import { Icon } from "@fluentui/react"
 import { StackShim } from "@fluentui/react-migration-v8-v9"
 
+// Sidebar marker for entries whose view no longer follows the global default.
+const VIEW_ICONS: Record<ViewType, string> = {
+    [ViewType.Cards]: "GridViewMedium",
+    [ViewType.List]: "BacklogList",
+    [ViewType.Magazine]: "Articles",
+    [ViewType.Compact]: "BulletedList",
+    [ViewType.Customized]: "Tiles",
+}
+
 const useMenuClasses = makeStyles({
     menuBtn: {
         height: "var(--navHeight)",
@@ -61,7 +70,7 @@ const useMenuClasses = makeStyles({
         "width": "100%",
         "height": "100%",
         "pointerEvents": "none",
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             width: "280px !important",
             background: "none",
             backdropFilter: "none",
@@ -86,7 +95,7 @@ const useMenuClasses = makeStyles({
             "clip-path var(--transition-timing) 0.367s, opacity cubic-bezier(0, 0, 0.2, 1) 0.367s",
         "clipPath": "inset(0 100% 0 0)",
         "opacity": 0,
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             "backgroundColor": "var(--neutralLight)",
             "boxShadow": "none",
             "::after": {
@@ -105,12 +114,12 @@ const useMenuClasses = makeStyles({
     menuInnerShow: {
         "clipPath": "inset(0 -50px 0 0)",
         "opacity": 1,
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             clipPath: "inset(0)",
         },
     },
     menuInnerDarwin: {
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             background: "none",
         },
     },
@@ -161,6 +170,7 @@ export const Menu: React.FC = () => {
     const sources = useAppSelector(s => s.sources)
     const groups = useAppSelector(s => s.groups)
     const searchOn = useAppSelector(s => s.page.searchOn)
+    const groupViews = useAppSelector(s => s.page.groupViews)
     const articleOverlayOpen = useArticleOverlayOpen()
 
     const openItems = useMemo(
@@ -191,8 +201,8 @@ export const Menu: React.FC = () => {
         dispatch(initFeeds())
     }, [])
     const handleGroupContextMenu = useCallback(
-        (sids: number[], event: React.MouseEvent) => {
-            dispatch(openGroupMenu(sids, event))
+        (sids: number[], event: React.MouseEvent, menuKey?: string) => {
+            dispatch(openGroupMenu(sids, event, menuKey))
         },
         []
     )
@@ -254,9 +264,10 @@ export const Menu: React.FC = () => {
                     ) : undefined
                 }
                 unreadCount={s.unreadCount}
+                viewType={groupViews[key]}
                 onClick={() => handleSelectSource(s)}
                 onContextMenu={e => {
-                    handleGroupContextMenu([s.sid], e)
+                    handleGroupContextMenu([s.sid], e, key)
                 }}
             />
         )
@@ -415,6 +426,7 @@ export const Menu: React.FC = () => {
                                                 label={g.name}
                                                 isSelected={isGroupSelected}
                                                 unreadCount={groupUnread}
+                                                viewType={groupViews[groupKey]}
                                                 onClick={() =>
                                                     handleSelectSourceGroup(
                                                         g,
@@ -424,7 +436,8 @@ export const Menu: React.FC = () => {
                                                 onContextMenu={e =>
                                                     handleGroupContextMenu(
                                                         g.sids,
-                                                        e
+                                                        e,
+                                                        groupKey
                                                     )
                                                 }>
                                                 <Tree>
@@ -486,6 +499,21 @@ const useTreeItemClasses = makeStyles({
         paddingLeft: "4px",
         flexShrink: 0,
     },
+    asideGroup: {
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        marginLeft: "auto",
+        paddingLeft: "4px",
+        flexShrink: 0,
+    },
+    viewBadge: {
+        display: "flex",
+        alignItems: "center",
+        color: tokens.colorNeutralForeground3,
+        opacity: 0.75,
+        fontSize: "12px",
+    },
 })
 
 interface MenuTreeItemProps {
@@ -495,6 +523,8 @@ interface MenuTreeItemProps {
     isSelected?: boolean
     icon?: React.ReactElement
     unreadCount?: number
+    // set when this entry remembers a view of its own
+    viewType?: ViewType
     aside?: React.ReactElement
     onClick: () => void
     onContextMenu?: (e: React.MouseEvent) => void
@@ -508,6 +538,7 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
     isSelected = false,
     icon,
     unreadCount,
+    viewType,
     aside,
     onClick,
     onContextMenu,
@@ -515,11 +546,25 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
 }) => {
     const c = useTreeItemClasses()
     const { level } = useSubtreeContext_unstable()
-    let resolvedAside: React.ReactElement | undefined = aside
-    if (resolvedAside === undefined && unreadCount && unreadCount > 0) {
-        resolvedAside = (
+    const count =
+        unreadCount && unreadCount > 0 ? (
             <span className={c.unreadCount}>
                 {unreadCount >= 1000 ? "999+" : String(unreadCount)}
+            </span>
+        ) : undefined
+    let resolvedAside: React.ReactElement | undefined = aside
+    if (resolvedAside === undefined && (viewType !== undefined || count)) {
+        resolvedAside = (
+            <span className={c.asideGroup}>
+                {viewType !== undefined ? (
+                    <span
+                        className={c.viewBadge}
+                        title={intl.get("context.customView")}
+                        aria-label={intl.get("context.customView")}>
+                        <Icon iconName={VIEW_ICONS[viewType]} />
+                    </span>
+                ) : null}
+                {count}
             </span>
         )
     }

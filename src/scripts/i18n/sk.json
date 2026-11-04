@@ -19,7 +19,6 @@
     "confirm": "Potvrdiť",
     "cancel": "Zrušiť",
     "default": "Predvolené",
-
     "time": {
         "now": "teraz",
         "m": "m",
@@ -29,7 +28,6 @@
         "hour": "{h, plural, =1 {# hodina} other {# hodiny}}",
         "day": "{d, plural, =1 {# deň} other {# dni}}"
     },
-
     "log": {
         "empty": "Žiadne notifikácie",
         "fetchFailure": "Nepodarilo sa načítať zdroj \"{name}\".",
@@ -38,7 +36,6 @@
         "parseError": "Chyba pri spracovaní RSS XML feedu.",
         "syncFailure": "Synchronizácia so službou zlyhala"
     },
-
     "nav": {
         "menu": "Menu",
         "refresh": "Obnoviť",
@@ -49,12 +46,10 @@
         "minimize": "Minimalizovať",
         "maximize": "Maximalizovať"
     },
-
     "menu": {
         "close": "Zavrieť menu",
         "subscriptions": "Odbery"
     },
-
     "article": {
         "error": "Nepodarilo sa načítať článok.",
         "reload": "Znova načítať?",
@@ -79,7 +74,6 @@
         "Vertical": "Vertikálne",
         "font": "Písmo"
     },
-
     "context": {
         "share": "Zdieľať",
         "read": "Čítať",
@@ -92,6 +86,10 @@
         "listView": "Zoznam",
         "magazineView": "Magazín",
         "compactView": "Kompaktné",
+        "waterfallView": "Vodopád",
+        "customView": "Táto položka má vlastné zobrazenie",
+        "resetView": "Obnoviť predvolené zobrazenie",
+        "undoMarkAll": "Vrátiť poslednú akciu",
         "filter": "Filtrovanie",
         "unreadOnly": "Iba neprečítané",
         "starredOnly": "Iba označené",
@@ -106,7 +104,6 @@
         "showSnippet": "Zobraziť ukážku",
         "fadeRead": "Zosivieť prečítané"
     },
-
     "searchEngine": {
         "name": "Vyhľadávač",
         "google": "Google",
@@ -114,7 +111,6 @@
         "baidu": "Baidu",
         "duckduckgo": "DuckDuckGo"
     },
-
     "settings": {
         "writeError": "Chyba pri zapisovaní súboru.",
         "name": "Nastavenia",
@@ -131,7 +127,6 @@
         "openSource": "Open source",
         "feedback": "Spätná väzba"
     },
-
     "sources": {
         "serviceWarning": "Zdroje tu nebudú synchronizované so službou.",
         "serviceManaged": "Tento zdroj spravuje služba.",
@@ -161,7 +156,6 @@
         "selectedMulti": "Viac vybraných zdrojov",
         "hidden": "Skryť vo \"všetkých článkoch\""
     },
-
     "groups": {
         "exist": "Skupina už existuje.",
         "type": "Typ",
@@ -181,7 +175,6 @@
         "addToGroup": "Pridať do ...",
         "groupHint": "Dvojklik pre úpravu skupiny. Drag & drop pre poradie."
     },
-
     "rules": {
         "intro": "Automatické pravidlá pre články pomocou regexu.",
         "help": "Viac info",
@@ -203,7 +196,6 @@
         "hint": "Pravidlá sa aplikujú postupne.",
         "test": "Testovať pravidlá"
     },
-
     "service": {
         "intro": "Synchronizácia RSS služieb.",
         "select": "Vyber službu",
@@ -224,7 +216,6 @@
         "fetchUnlimited": "Neobmedzene (neodporúčané)",
         "exportToLite": "Export do Lite verzie"
     },
-
     "app": {
         "cleanup": "Vyčistiť",
         "cache": "Vymazať cache",

@@ -280,7 +280,13 @@ const Nav: React.FC = () => {
                             <FlatButton
                                 styleClass={classes.navBtn}
                                 id="mark-all-toggle"
-                                onClick={markAll}
+                                onClick={markAllDirect}
+                                onContextMenu={e => {
+                                    // left click acts immediately; right click
+                                    // opens the dated variants and undo
+                                    e.preventDefault()
+                                    markAll()
+                                }}
                                 title={intl.get("nav.markAllRead")}
                                 onMouseDown={e => {
                                     if (

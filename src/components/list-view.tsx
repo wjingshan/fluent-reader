@@ -28,7 +28,7 @@ const useStyles = makeStyles({
         backgroundColor: "var(--colorNeutralBackground1)",
     },
     menuOpen: {
-        "@media (min-width: 1440px)": {
+        "@media (min-width: 1024px)": {
             marginLeft: "280px",
         },
     },

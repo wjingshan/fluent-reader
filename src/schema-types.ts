@@ -132,6 +132,9 @@ export type SchemaTypes = {
     serviceConfigs: ServiceConfigs
     filterType: number
     listViewConfigs: ViewConfigs
+    // Per-menu-entry view preference. Keys are menu keys ("all", "g-<gid>",
+    // "s-<sid>"); a missing key falls back to the global `view`.
+    groupViews: Record<string, ViewType>
     menuUnreadSourcesOnly: boolean
     sourceRules: StoredRules
     dbVersion: string

@@ -98,6 +98,7 @@ export interface FlatButtonProps {
     id?: string
     onClick?: React.MouseEventHandler<HTMLButtonElement>
     onMouseDown?: React.MouseEventHandler<HTMLButtonElement>
+    onContextMenu?: React.MouseEventHandler<HTMLButtonElement>
     disabled?: boolean
     fetching?: boolean
     variant?: FlatButtonVariant
@@ -111,6 +112,7 @@ export const FlatButton: React.FC<FlatButtonProps> = ({
     id,
     onClick,
     onMouseDown,
+    onContextMenu,
     disabled,
     fetching,
     variant = "default",
@@ -132,6 +134,7 @@ export const FlatButton: React.FC<FlatButtonProps> = ({
             id={id}
             onClick={disabled ? undefined : onClick}
             onMouseDown={disabled ? undefined : onMouseDown}
+            onContextMenu={disabled ? undefined : onContextMenu}
             disabled={disabled}>
             {children}
         </button>

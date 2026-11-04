@@ -98,11 +98,17 @@ export class AppState {
         logs: new Array<AppLog>(),
     }
 
+    // Item ids that the most recent "mark all as read" actually changed, so the
+    // action can be undone. null means there is nothing to undo.
+    lastMarkAll = null as number[]
+
     contextMenu: {
         type: ContextMenuType
         event?: MouseEvent | string
         position?: [number, number]
         target?: [RSSItem, string] | number[] | [string, string]
+        // sidebar entry the menu belongs to, for menus that act on one entry
+        menuKey?: string
     }
 
     constructor() {
@@ -119,6 +125,8 @@ export const OPEN_VIEW_MENU = "OPEN_VIEW_MENU"
 export const OPEN_GROUP_MENU = "OPEN_GROUP_MENU"
 export const OPEN_IMAGE_MENU = "OPEN_IMAGE_MENU"
 export const OPEN_MARK_ALL_MENU = "OPEN_MARK_ALL_MENU"
+export const SET_LAST_MARK_ALL = "SET_LAST_MARK_ALL"
+export const CLEAR_LAST_MARK_ALL = "CLEAR_LAST_MARK_ALL"
 
 interface CloseContextMenuAction {
     type: typeof CLOSE_CONTEXT_MENU
@@ -145,10 +153,21 @@ interface OpenMarkAllMenuAction {
     type: typeof OPEN_MARK_ALL_MENU
 }
 
+interface SetLastMarkAllAction {
+    type: typeof SET_LAST_MARK_ALL
+    iids: number[]
+}
+
+interface ClearLastMarkAllAction {
+    type: typeof CLEAR_LAST_MARK_ALL
+}
+
 interface OpenGroupMenuAction {
     type: typeof OPEN_GROUP_MENU
     event: MouseEvent
     sids: number[]
+    // the sidebar entry this menu was opened on ("g-<gid>" / "s-<sid>")
+    menuKey?: string
 }
 
 interface OpenImageMenuAction {
@@ -164,6 +183,20 @@ export type ContextMenuActionTypes =
     | OpenGroupMenuAction
     | OpenImageMenuAction
     | OpenMarkAllMenuAction
+
+// Bookkeeping for undoing the last "mark all as read".
+export type MarkAllUndoActionTypes =
+    | SetLastMarkAllAction
+    | ClearLastMarkAllAction
+
+export const setLastMarkAll = (iids: number[]): MarkAllUndoActionTypes => ({
+    type: SET_LAST_MARK_ALL,
+    iids: iids,
+})
+
+export const clearLastMarkAll = (): MarkAllUndoActionTypes => ({
+    type: CLEAR_LAST_MARK_ALL,
+})
 
 export const TOGGLE_LOGS = "TOGGLE_LOGS"
 export const PUSH_NOTIFICATION = "PUSH_NOTIFICATION"
@@ -247,12 +280,14 @@ export const openViewMenu = (): ContextMenuActionTypes => ({
 
 export function openGroupMenu(
     sids: number[],
-    event: React.MouseEvent
+    event: React.MouseEvent,
+    menuKey?: string
 ): ContextMenuActionTypes {
     return {
         type: OPEN_GROUP_MENU,
         event: event.nativeEvent,
         sids: sids,
+        menuKey: menuKey,
     }
 }
 
@@ -433,6 +468,7 @@ export function appReducer(
         | PageActionTypes
         | SourceGroupActionTypes
         | ServiceActionTypes
+        | MarkAllUndoActionTypes
 ): AppState {
     switch (action.type) {
         case INIT_INTL:
@@ -642,6 +678,7 @@ export function appReducer(
                     type: ContextMenuType.Group,
                     event: action.event,
                     target: action.sids,
+                    menuKey: action.menuKey,
                 },
             }
         case OPEN_IMAGE_MENU:
@@ -653,15 +690,24 @@ export function appReducer(
                 },
             }
         case OPEN_MARK_ALL_MENU:
+            // Always open: this menu is now reached by right-clicking the button,
+            // so a toggle would close it on the second right-click.
             return {
                 ...state,
                 contextMenu: {
-                    type:
-                        state.contextMenu.type === ContextMenuType.MarkRead
-                            ? ContextMenuType.Hidden
-                            : ContextMenuType.MarkRead,
+                    type: ContextMenuType.MarkRead,
                     event: "#mark-all-toggle",
                 },
+            }
+        case SET_LAST_MARK_ALL:
+            return {
+                ...state,
+                lastMarkAll: action.iids.length > 0 ? action.iids : null,
+            }
+        case CLEAR_LAST_MARK_ALL:
+            return {
+                ...state,
+                lastMarkAll: null,
             }
         case TOGGLE_MENU:
             return {

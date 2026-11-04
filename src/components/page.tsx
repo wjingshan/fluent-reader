@@ -42,7 +42,7 @@ const usePageClasses = makeStyles({
         },
     },
     feedMenuOpen: {
-        "@media (min-width: 1440px)": { marginLeft: "280px" },
+        "@media (min-width: 1024px)": { marginLeft: "280px" },
     },
     articleContainer: {
         position: "fixed",

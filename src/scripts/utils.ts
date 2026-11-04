@@ -161,7 +161,7 @@ export const urlTest = (s: string) =>
         s
     )
 
-export const getWindowBreakpoint = () => window.innerWidth >= 1440
+export const getWindowBreakpoint = () => window.innerWidth >= 1024
 
 export const cutText = (s: string, length: number) => {
     return s.length <= length ? s : s.slice(0, length) + "…"

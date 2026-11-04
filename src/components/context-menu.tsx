@@ -26,11 +26,13 @@ import {
     RSSItem,
     toggleHidden,
     toggleStarred,
+    undoLastMarkAll,
 } from "../scripts/models/item"
 import { ViewType, ImageCallbackTypes, ViewConfigs } from "../schema-types"
 import { FilterType } from "../scripts/models/feed"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import {
+    resetGroupView,
     setViewConfigs,
     showItem,
     switchFilter,
@@ -411,6 +413,15 @@ function ViewContextMenu() {
                         checked: viewType === ViewType.Compact,
                         onClick: () => dispatch(switchView(ViewType.Compact)),
                     },
+                    {
+                        key: "waterfallView",
+                        text: intl.get("context.waterfallView"),
+                        iconProps: { iconName: "Tiles" },
+                        canCheck: true,
+                        checked: viewType === ViewType.Customized,
+                        onClick: () =>
+                            dispatch(switchView(ViewType.Customized)),
+                    },
                 ],
             },
         },
@@ -513,6 +524,9 @@ function GroupContextMenu() {
     const sids = useAppSelector(
         state => state.app.contextMenu.target
     ) as number[]
+    const menuKey = useAppSelector(state => state.app.contextMenu.menuKey)
+    const groupViews = useAppSelector(state => state.page.groupViews)
+    const hasOwnView = Boolean(menuKey && groupViews[menuKey] !== undefined)
 
     const menuItems: IContextualMenuItem[] = [
         {
@@ -540,13 +554,33 @@ function GroupContextMenu() {
             },
         },
     ]
+    if (hasOwnView) {
+        menuItems.push({
+            key: "resetView",
+            text: intl.get("context.resetView"),
+            iconProps: { iconName: "ClearFilter" },
+            onClick: () => {
+                dispatch(resetGroupView(menuKey))
+            },
+        })
+    }
     return <ContextMenuBase menuItems={menuItems} />
 }
 
 function MarkReadContextMenu() {
     const dispatch = useAppDispatch()
+    const lastMarkAll = useAppSelector(state => state.app.lastMarkAll)
 
     const menuItems: IContextualMenuItem[] = [
+        {
+            key: "undoLastMarkAll",
+            text: intl.get("context.undoMarkAll"),
+            iconProps: { iconName: "Undo" },
+            disabled: !lastMarkAll || lastMarkAll.length === 0,
+            onClick: () => {
+                dispatch(undoLastMarkAll())
+            },
+        },
         {
             key: "section_1",
             itemType: ContextualMenuItemType.Section,

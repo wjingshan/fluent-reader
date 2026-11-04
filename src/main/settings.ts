@@ -125,6 +125,34 @@ ipcMain.handle("set-view", (_, viewType: ViewType) => {
     store.set(VIEW_STORE_KEY, viewType)
 })
 
+// A view per sidebar entry, so one group can be a waterfall while another stays
+// a card grid. Missing entries deliberately return undefined: the caller then
+// uses the global `view` instead of freezing everyone onto one layout.
+const GROUP_VIEWS_STORE_KEY = "groupViews"
+ipcMain.on("get-group-view", (event, key: string) => {
+    if (!key) {
+        event.returnValue = undefined
+        return
+    }
+    const views = store.get(GROUP_VIEWS_STORE_KEY, {})
+    event.returnValue = views[key]
+})
+ipcMain.handle("set-group-view", (_, key: string, viewType: ViewType) => {
+    if (!key) return
+    const views = { ...store.get(GROUP_VIEWS_STORE_KEY, {}) }
+    views[key] = viewType
+    store.set(GROUP_VIEWS_STORE_KEY, views)
+})
+ipcMain.on("get-group-views", event => {
+    event.returnValue = store.get(GROUP_VIEWS_STORE_KEY, {})
+})
+ipcMain.handle("clear-group-view", (_, key: string) => {
+    if (!key) return
+    const views = { ...store.get(GROUP_VIEWS_STORE_KEY, {}) }
+    delete views[key]
+    store.set(GROUP_VIEWS_STORE_KEY, views)
+})
+
 const THEME_STORE_KEY = "theme"
 ipcMain.on("get-theme", event => {
     event.returnValue = store.get(THEME_STORE_KEY, ThemeSettings.Default)

@@ -49,6 +49,19 @@ const settingsBridge = {
         ipcRenderer.invoke("set-view", viewType)
     },
 
+    getGroupView: (key: string): ViewType | undefined => {
+        return ipcRenderer.sendSync("get-group-view", key)
+    },
+    setGroupView: (key: string, viewType: ViewType) => {
+        ipcRenderer.invoke("set-group-view", key, viewType)
+    },
+    getAllGroupViews: (): Record<string, ViewType> => {
+        return ipcRenderer.sendSync("get-group-views")
+    },
+    clearGroupView: (key: string) => {
+        ipcRenderer.invoke("clear-group-view", key)
+    },
+
     getThemeSettings: (): ThemeSettings => {
         return ipcRenderer.sendSync("get-theme")
     },

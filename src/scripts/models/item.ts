@@ -1,5 +1,5 @@
 import { getRulesForTarget } from "./rule"
-import { eq, and, lte, gte } from "drizzle-orm"
+import { eq, and, lte, gte, inArray } from "drizzle-orm"
 import { database, itemsTable, itemsInSources } from "../db"
 import { getValidDate } from "../date"
 import intl from "react-intl-universal"
@@ -18,6 +18,8 @@ import {
     setupAutoFetch,
     SettingsActionTypes,
     FREE_MEMORY,
+    setLastMarkAll,
+    clearLastMarkAll,
 } from "./app"
 import {
     getServiceHooks,
@@ -133,6 +135,7 @@ export type ItemState = {
 export const FETCH_ITEMS = "FETCH_ITEMS"
 export const MARK_READ = "MARK_READ"
 export const MARK_ALL_READ = "MARK_ALL_READ"
+export const UNDO_MARK_ALL_READ = "UNDO_MARK_ALL_READ"
 export const MARK_UNREAD = "MARK_UNREAD"
 export const TOGGLE_STARRED = "TOGGLE_STARRED"
 export const TOGGLE_HIDDEN = "TOGGLE_HIDDEN"
@@ -159,6 +162,11 @@ interface MarkAllReadAction {
     before?: boolean
 }
 
+interface UndoMarkAllReadAction {
+    type: typeof UNDO_MARK_ALL_READ
+    iids: number[]
+}
+
 interface MarkUnreadAction {
     type: typeof MARK_UNREAD
     item: RSSItem
@@ -178,6 +186,7 @@ export type ItemActionTypes =
     | FetchItemsAction
     | MarkReadAction
     | MarkAllReadAction
+    | UndoMarkAllReadAction
     | MarkUnreadAction
     | ToggleStarredAction
     | ToggleHiddenAction
@@ -424,10 +433,21 @@ export function markAllRead(
                 before ? lte(itemsTable.date, date) : gte(itemsTable.date, date)
             )
         }
+        // Collect the ids the update will touch *before* running it. This has to
+        // come from the database, not from the store: markAllRead covers every
+        // unread row of those sources, while the store only holds the items the
+        // current view has paged in, and undo must restore all of them.
+        const affected = await database
+            .select({ _id: itemsTable._id })
+            .from(itemsTable)
+            .where(and(...conditions))
         await database
             .update(itemsTable)
             .set({ hasRead: true })
             .where(and(...conditions))
+        if (affected.length > 0) {
+            dispatch(setLastMarkAll(affected.map(row => row._id)))
+        }
         if (date) {
             dispatch({
                 type: MARK_ALL_READ,
@@ -442,6 +462,21 @@ export function markAllRead(
                 sids: sids,
             })
         }
+    }
+}
+
+// Put the items changed by the last "mark all as read" back to unread.
+export function undoLastMarkAll(): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        const iids = getState().app.lastMarkAll
+        if (!iids || iids.length === 0) return
+        await database
+            .update(itemsTable)
+            .set({ hasRead: false })
+            .where(inArray(itemsTable._id, iids))
+        dispatch({ type: UNDO_MARK_ALL_READ, iids: iids })
+        dispatch(clearLastMarkAll())
+        dispatch(updateUnreadCounts())
     }
 }
 
@@ -591,6 +626,19 @@ export function itemReducer(
                             ...item,
                             hasRead: true,
                         }
+                    }
+                }
+            }
+            return nextState
+        }
+        case UNDO_MARK_ALL_READ: {
+            let nextState = { ...state }
+            for (const iid of action.iids) {
+                const item = nextState[iid]
+                if (item && item.hasRead) {
+                    nextState[iid] = {
+                        ...item,
+                        hasRead: false,
                     }
                 }
             }
