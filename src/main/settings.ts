@@ -326,3 +326,11 @@ ipcMain.on("get-unread-sources-only", event => {
 ipcMain.handle("set-unread-sources-only", (_, flag: boolean) => {
     store.set(UNREAD_SOURCES_ONLY_STORE_KEY, flag)
 })
+
+const DUPLICATE_FILTER_STORE_KEY = "duplicateFilter"
+ipcMain.on("get-duplicate-filter", event => {
+    event.returnValue = store.get(DUPLICATE_FILTER_STORE_KEY, 0)
+})
+ipcMain.handle("set-duplicate-filter", (_, mode: number) => {
+    store.set(DUPLICATE_FILTER_STORE_KEY, Number(mode) === 1 ? 1 : 0)
+})

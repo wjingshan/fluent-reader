@@ -241,6 +241,8 @@
         "setPac": "Nastaviť PAC",
         "pacHint": "SOCKS5 odporúčaný pre DNS.",
         "fetchInterval": "Interval aktualizácie",
-        "never": "Nikdy"
+        "never": "Nikdy",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

@@ -31,6 +31,7 @@ import { DangerButton } from "../utils/DangerButton"
 type AppTabProps = {
     setLanguage: (option: string) => void
     setFetchInterval: (interval: number) => void
+    setDuplicateFilter: (mode: number) => void
     deleteArticles: (days: number) => Promise<void>
     importAll: () => Promise<void>
 }
@@ -49,6 +50,7 @@ const useStyles = makeStyles({
 function AppTab({
     setLanguage,
     setFetchInterval,
+    setDuplicateFilter,
     deleteArticles,
     importAll,
 }: AppTabProps) {
@@ -59,6 +61,9 @@ function AppTab({
     const [theme, setTheme] = useState(getThemeSettings)
     const [fetchInterval, setSelectedFetchInterval] = useState(() =>
         String(window.settings.getFetchInterval())
+    )
+    const [mergeDuplicates, setMergeDuplicates] = useState(
+        () => window.settings.getDuplicateFilter() === 1
     )
     const [searchEngine, setSearchEngine] = useState(() =>
         window.settings.getSearchEngine()
@@ -198,6 +203,21 @@ function AppTab({
                         label={intl.get("app.darkTheme")}
                     />
                 </RadioGroup>
+            </Field>
+
+            <Field
+                className={classes.proxy}
+                orientation="horizontal"
+                label={intl.get("app.duplicateFilter")}
+                hint={intl.get("app.duplicateFilterHint")}>
+                <Switch
+                    checked={mergeDuplicates}
+                    onChange={(_, data) => {
+                        const enabled = data.checked
+                        setMergeDuplicates(enabled)
+                        setDuplicateFilter(enabled ? 1 : 0)
+                    }}
+                />
             </Field>
 
             <Field label={intl.get("app.fetchInterval")}>

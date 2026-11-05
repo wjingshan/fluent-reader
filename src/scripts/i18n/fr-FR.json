@@ -237,6 +237,8 @@
         "setPac": "Définir PAC",
         "pacHint": "Pour les proxies Sockets, il est recommandé que le PAC retourne \"SOCKS5\" pour le DNS côté proxies. La désactivation du proxy nécessite un redémarrage.",
         "fetchInterval": "Intervalle de récupération automatique",
-        "never": "Jamais"
+        "never": "Jamais",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

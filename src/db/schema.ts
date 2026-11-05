@@ -37,6 +37,9 @@ export const itemsTable = sqliteTable(
         hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
         notify: integer("notify", { mode: "boolean" }).notNull().default(false),
         serviceRef: text("serviceRef"),
+        // Canonical form of `link`, used to merge copies of one article that
+        // arrived through different sources. "" means the link is unusable.
+        linkKey: text("linkKey"),
     },
     table => [
         index("items_source_date").on(
@@ -60,5 +63,8 @@ export const itemsTable = sqliteTable(
         index("items_starred_date")
             .on(table.starred, desc(table.date), desc(table._id))
             .where(sql`${table.starred} = 1`),
+        index("items_link_key")
+            .on(table.linkKey)
+            .where(sql`${table.linkKey} IS NOT NULL`),
     ]
 )

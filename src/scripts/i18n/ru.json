@@ -246,6 +246,8 @@
         "setPac": "Установить PAC",
         "pacHint": "Для Socks прокси рекомендуется, чтобы PAC возвращал \"SOCKS5\" для DNS на стороне прокси. Выключение прокси требует перезапуска.",
         "fetchInterval": "Интервал автоматического обновления",
-        "never": "Никогда"
+        "never": "Никогда",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

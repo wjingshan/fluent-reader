@@ -178,6 +178,13 @@ const settingsBridge = {
     setUnreadSourcesOnly: (flag: boolean) => {
         ipcRenderer.invoke("set-unread-sources-only", flag)
     },
+
+    getDuplicateFilter: (): number => {
+        return ipcRenderer.sendSync("get-duplicate-filter")
+    },
+    setDuplicateFilter: (mode: number) => {
+        ipcRenderer.invoke("set-duplicate-filter", mode)
+    },
 }
 
 declare global {

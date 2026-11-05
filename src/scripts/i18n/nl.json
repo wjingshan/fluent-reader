@@ -240,6 +240,8 @@
         "setPac": "PAC instellen",
         "pacHint": "Bij Socks-proxies is het aanbevolen om PAC ‘SOCKS5’ te laten ophalen aan de dns-kant. Herstart om de proxy uit te schakelen.",
         "fetchInterval": "Automatisch ophalen",
-        "never": "Nooit"
+        "never": "Nooit",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

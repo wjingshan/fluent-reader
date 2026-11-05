@@ -4,6 +4,7 @@ import { inArray, sql } from "drizzle-orm"
 import type { BatchItem } from "drizzle-orm/batch"
 import { sourcesTable, itemsTable } from "../db/schema"
 import { getValidDate } from "./date"
+import { storedLinkKey } from "./duplicate"
 
 export { itemsTable, sourcesTable } from "../db/schema"
 
@@ -170,6 +171,9 @@ export async function init() {
                                 hidden: (item.hidden as boolean) || false,
                                 notify: (item.notify as boolean) || false,
                                 serviceRef: (item.serviceRef as string) || null,
+                                linkKey: storedLinkKey(
+                                    (item.link as string) || ""
+                                ),
                             }
                         })
                     )

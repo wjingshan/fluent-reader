@@ -247,6 +247,8 @@
         "setPac": "Ustaw PAC",
         "pacHint": "Dla serwerów proxy Socks, zalecane jest aby PAC zwrócił \"SOCKS5\" dla DNS po stronie proxy. Wyłączenie serwera pośredniczącego wymaga restartu.",
         "fetchInterval": "Częstotliwość automatycznego pobierania danych",
-        "never": "Nigdy"
+        "never": "Nigdy",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

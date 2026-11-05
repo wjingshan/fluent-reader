@@ -240,6 +240,8 @@
         "setPac": " Imposta PAC",
         "pacHint": "Per proxies Socks, è raccomandato per i PAC di ritornare \"SOCKS5\" per proxy-side DNS. Disabilitare i proxy neccessita il riavvio dell'applicazione",
         "fetchInterval": "Ricarica intervallo Automaticamente",
-        "never": "Mai"
+        "never": "Mai",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

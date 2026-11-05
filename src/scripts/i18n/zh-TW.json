@@ -245,6 +245,8 @@
         "setPac": "設定PAC",
         "pacHint": "對於Socks代理建議PAC返回“SOCKS5”以啟用代理端解析。關閉代理需重啟應用後生效。",
         "fetchInterval": "自動抓取頻率",
-        "never": "從不"
+        "never": "從不",
+        "duplicateFilter": "合併重複文章",
+        "duplicateFilterHint": "多個訂閱來源轉載同一篇文章時只顯示一則。依文章連結判斷，不刪除任何資料；關閉後所有副本重新顯示。"
     }
 }

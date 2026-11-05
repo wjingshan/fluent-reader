@@ -1,5 +1,7 @@
 import { database, itemsTable, itemsInSources } from "../db"
 import { and, eq, desc, sql } from "drizzle-orm"
+import type { SQL } from "drizzle-orm"
+import { duplicateFilterEnabled } from "../duplicate"
 import {
     SourceActionTypes,
     INIT_SOURCES,
@@ -74,6 +76,45 @@ export const SOURCE = "SOURCE"
 
 const LOAD_QUANTITY = 50
 
+// Keeps one row per canonical link within the feed's own source scope, choosing
+// the earliest copy that satisfies the active filter. Rows without a usable
+// linkKey are always kept: they cannot be compared with anything.
+function dedupeCondition(feed: RSSFeed, type: FilterType, search: string): SQL {
+    const sources = sql`(SELECT CAST(value AS INTEGER) FROM json_each(${JSON.stringify(
+        feed.sids
+    )}))`
+    const inner: SQL[] = [
+        sql`x."linkKey" = ${itemsTable.linkKey}`,
+        sql`x."source" IN ${sources}`,
+    ]
+    if (!(type & FilterType.ShowRead)) inner.push(sql`x."hasRead" = 0`)
+    if (!(type & FilterType.ShowNotStarred)) inner.push(sql`x."starred" = 1`)
+    if (!(type & FilterType.ShowHidden)) inner.push(sql`x."hidden" = 0`)
+    if (search !== "") {
+        const regexp = sql.raw(
+            type & FilterType.CaseInsensitive ? "regexpi" : "regexp"
+        )
+        if (type & FilterType.FullSearch) {
+            inner.push(
+                sql`(${regexp}(${search}, x."title") OR ${regexp}(${search}, x."snippet"))`
+            )
+        } else if (type & FilterType.CreatorSearch) {
+            inner.push(sql`${regexp}(${search}, x."creator")`)
+        } else {
+            inner.push(sql`${regexp}(${search}, x."title")`)
+        }
+    }
+    return sql`(
+        coalesce(length(${itemsTable.linkKey}), 0) = 0
+        OR ${itemsTable._id} = (
+            SELECT x."_id" FROM items x
+            WHERE ${sql.join(inner, sql` AND `)}
+            ORDER BY x."date" ASC, x."_id" ASC
+            LIMIT 1
+        )
+    )`
+}
+
 export class RSSFeed {
     _id: string
     loaded: boolean
@@ -103,6 +144,15 @@ export class RSSFeed {
             conditions.push(eq(itemsTable.starred, true))
         if (!(type & FilterType.ShowHidden))
             conditions.push(eq(itemsTable.hidden, false))
+        // Duplicate copies of one article are collapsed to a single row. The
+        // chosen row is the earliest copy that satisfies the current filter, so
+        // the position of an article never jumps when another feed re-posts it.
+        // The condition runs inside SQL: the page size and offset keep their
+        // usual meaning, no rows are deleted and turning the setting off brings
+        // every copy back.
+        if (duplicateFilterEnabled()) {
+            conditions.push(dedupeCondition(feed, type, filter.search))
+        }
         if (filter.search !== "") {
             const pattern = filter.search
             if (type & FilterType.FullSearch) {
@@ -389,6 +439,38 @@ export function feedReducer(
                                     feed.sids.includes(i.source) &&
                                     FeedFilter.testItem(feed.filter, i)
                             )
+                            if (items.length > 0 && duplicateFilterEnabled()) {
+                                // A freshly fetched copy must not appear next to
+                                // the copy already on screen: keep the earliest.
+                                const known = new Map<string, number>()
+                                for (const iid of feed.iids) {
+                                    const old = action.itemState[iid]
+                                    if (old && old.linkKey) {
+                                        known.set(
+                                            old.linkKey,
+                                            old.date.getTime()
+                                        )
+                                    }
+                                }
+                                items = items
+                                    .slice()
+                                    .sort(
+                                        (a, b) =>
+                                            a.date.getTime() -
+                                                b.date.getTime() ||
+                                            a._id - b._id
+                                    )
+                                    .filter(item => {
+                                        if (!item.linkKey) return true
+                                        if (known.has(item.linkKey))
+                                            return false
+                                        known.set(
+                                            item.linkKey,
+                                            item.date.getTime()
+                                        )
+                                        return true
+                                    })
+                            }
                             if (items.length > 0) {
                                 let oldItems = feed.iids.map(
                                     id => action.itemState[id]

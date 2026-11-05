@@ -9,6 +9,8 @@ import { lt, sql } from "drizzle-orm"
 import AppTab from "../../components/settings/app"
 import { importAll } from "../../scripts/settings"
 import { updateUnreadCounts } from "../../scripts/models/source"
+import { initFeeds } from "../../scripts/models/feed"
+import { setDuplicateFilterMode } from "../../scripts/duplicate"
 import { AppDispatch } from "../../scripts/utils"
 
 const mapDispatchToProps = (dispatch: AppDispatch) => ({
@@ -19,6 +21,11 @@ const mapDispatchToProps = (dispatch: AppDispatch) => ({
     setFetchInterval: (interval: number) => {
         window.settings.setFetchInterval(interval)
         dispatch(setupAutoFetch())
+    },
+    setDuplicateFilter: (mode: number) => {
+        setDuplicateFilterMode(mode)
+        // Every list has to be rebuilt: the merge runs in the query itself.
+        dispatch(initFeeds(true))
     },
     deleteArticles: async (days: number) => {
         dispatch(saveSettings())

@@ -240,6 +240,8 @@
         "setPac": "Встановити PAC",
         "pacHint": "Для проксі Socks рекомендується, щоб PAC повертав \"SOCKS5\" для DNS на стороні проксі. Для відключення проксі потрібне перезавантаження.",
         "fetchInterval": "Інтервал автоматичної вибірки",
-        "never": "Ніколи"
+        "never": "Ніколи",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

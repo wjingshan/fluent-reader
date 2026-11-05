@@ -26,7 +26,9 @@
         "pacHint": "Socks -välityspalvelimille on suositeltavaa asettaa PAC palauttamaan \"SOCKS5\" välityspalvelminen DNS:tä. Välityspalvelimen laittaminen pois päältä vaatii uudelleenkäynnistyksen,",
         "restore": "Palauta",
         "setPac": "Aseta PAC",
-        "theme": "Teema"
+        "theme": "Teema",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     },
     "article": {
         "dontNotify": "Älä ilmoita",

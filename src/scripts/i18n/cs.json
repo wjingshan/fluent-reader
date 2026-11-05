@@ -247,6 +247,8 @@
         "setPac": "Nastavit PAC",
         "pacHint": "U proxy serverů Socks se doporučuje, aby PAC vracel \"SOCKS5\" pro DNS na straně proxy serveru. Vypnutí proxy vyžaduje restart.",
         "fetchInterval": "Automatický interval načítání",
-        "never": "Nikdy"
+        "never": "Nikdy",
+        "duplicateFilter": "Merge duplicate articles",
+        "duplicateFilterHint": "When several feeds carry the same article, show it once. Matching uses the article link; nothing is deleted, and turning this off restores every copy."
     }
 }

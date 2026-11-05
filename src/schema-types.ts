@@ -138,4 +138,6 @@ export type SchemaTypes = {
     menuUnreadSourcesOnly: boolean
     sourceRules: StoredRules
     dbVersion: string
+    // 0 = off, 1 = merge copies of the same canonical link (see duplicate.ts).
+    duplicateFilter: number
 }

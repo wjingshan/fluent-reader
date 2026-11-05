@@ -13,6 +13,7 @@ import { WindowManager } from "./window"
 import performUpdate from "./update-scripts"
 import { transformLovefieldRules } from "./utils"
 import { getValidDate } from "../scripts/date"
+import { storedLinkKey } from "../scripts/duplicate"
 import type {
     DatabaseQuery,
     DatabaseResult,
@@ -31,6 +32,38 @@ function optimizeDB() {
     } catch (err) {
         // Statistics maintenance must not turn a committed write into a failure.
         console.warn("SQLite optimize error:", err)
+    }
+}
+
+// Rows written before the duplicate filter existed have no link key. Fill them
+// once, in place, so switching the feature on takes effect immediately instead
+// of only for articles fetched from now on.
+function backfillLinkKeys() {
+    let pending: { _id: number; link: unknown }[]
+    try {
+        pending = sqlite
+            .prepare(`SELECT _id, link FROM items WHERE "linkKey" IS NULL`)
+            .all() as { _id: number; link: unknown }[]
+    } catch (err) {
+        console.warn("linkKey backfill query failed:", err)
+        return
+    }
+    if (pending.length === 0) return
+    const update = sqlite.prepare(
+        `UPDATE items SET "linkKey" = ? WHERE _id = ?`
+    )
+    const write = sqlite.transaction(
+        (rows: { _id: number; link: unknown }[]) => {
+            for (const row of rows) {
+                update.run(
+                    storedLinkKey(typeof row.link === "string" ? row.link : ""),
+                    row._id
+                )
+            }
+        }
+    )
+    for (let i = 0; i < pending.length; i += 500) {
+        write(pending.slice(i, i + 500))
     }
 }
 
@@ -126,6 +159,10 @@ async function handleImportAll(texts: RestoreDialogTexts): Promise<boolean> {
             hidden: Boolean(i.hidden),
             notify: Boolean(i.notify),
             serviceRef: (i.serviceRef as string) || null,
+            linkKey:
+                typeof i.linkKey === "string"
+                    ? i.linkKey
+                    : storedLinkKey((i.link as string) || ""),
         }
     }
 
@@ -234,6 +271,7 @@ export function initDB(
     const migrationsFolder = path.join(__dirname, "drizzle")
 
     migrate(db, { migrationsFolder })
+    backfillLinkKeys()
     // Include all tables on opening this long-lived connection, then maintain
     // statistics after bulk writes, daily, and on an orderly shutdown.
     try {

@@ -2,6 +2,7 @@ import { getRulesForTarget } from "./rule"
 import { eq, and, lte, gte, inArray } from "drizzle-orm"
 import { database, itemsTable, itemsInSources } from "../db"
 import { getValidDate } from "../date"
+import { duplicateFilterEnabled, storedLinkKey } from "../duplicate"
 import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
 import {
@@ -45,6 +46,7 @@ export class RSSItem {
     hidden: boolean
     notify: boolean
     serviceRef?: string
+    linkKey?: string
 
     static normalize(item: RSSItem) {
         item.title =
@@ -81,6 +83,7 @@ export class RSSItem {
         this.starred = false
         this.hidden = false
         this.notify = false
+        this.linkKey = storedLinkKey(this.link)
     }
 
     static parseContent(item: RSSItem, parsed: MyParserItem) {
@@ -227,6 +230,39 @@ export function fetchItemsIntermediate(): ItemActionTypes {
     }
 }
 
+// Read/star state of every stored copy of the given link keys. Used to adopt
+// the state of an article we already have instead of re-announcing it.
+async function loadDuplicateStates(
+    keys: string[]
+): Promise<Map<string, { hasRead: boolean; starred: boolean }>> {
+    const states = new Map<string, { hasRead: boolean; starred: boolean }>()
+    const unique = Array.from(
+        new Set(keys.filter(key => typeof key === "string" && key.length > 0))
+    )
+    for (let i = 0; i < unique.length; i += 40) {
+        const rows = await database
+            .select({
+                linkKey: itemsTable.linkKey,
+                hasRead: itemsTable.hasRead,
+                starred: itemsTable.starred,
+            })
+            .from(itemsTable)
+            .where(inArray(itemsTable.linkKey, unique.slice(i, i + 40)))
+        for (const row of rows) {
+            const previous = states.get(row.linkKey)
+            states.set(row.linkKey, {
+                hasRead: previous
+                    ? previous.hasRead || row.hasRead
+                    : row.hasRead,
+                starred: previous
+                    ? previous.starred || row.starred
+                    : row.starred,
+            })
+        }
+    }
+    return states
+}
+
 export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
     if (items.length === 0) return []
     // Service integrations construct articles without going through RSSItem.
@@ -234,23 +270,38 @@ export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
         RSSItem.normalize(item)
     }
     items.sort((a, b) => a.date.getTime() - b.date.getTime())
-    const values = items.map(item => ({
-        source: item.source,
-        guid: item.guid || null,
-        title: item.title,
-        link: item.link,
-        date: item.date,
-        fetchedDate: item.fetchedDate,
-        thumb: item.thumb || null,
-        content: item.content,
-        snippet: item.snippet,
-        creator: item.creator || null,
-        hasRead: item.hasRead,
-        starred: item.starred,
-        hidden: item.hidden,
-        notify: item.notify,
-        serviceRef: item.serviceRef || null,
-    }))
+    const keys = items.map(item =>
+        typeof item.linkKey === "string"
+            ? item.linkKey
+            : storedLinkKey(item.link)
+    )
+    const storedCopies = duplicateFilterEnabled()
+        ? await loadDuplicateStates(keys)
+        : new Map<string, { hasRead: boolean; starred: boolean }>()
+    const values = items.map((item, index) => {
+        const linkKey = keys[index]
+        const copy = linkKey ? storedCopies.get(linkKey) : undefined
+        return {
+            source: item.source,
+            guid: item.guid || null,
+            title: item.title,
+            link: item.link,
+            date: item.date,
+            fetchedDate: item.fetchedDate,
+            thumb: item.thumb || null,
+            content: item.content,
+            snippet: item.snippet,
+            creator: item.creator || null,
+            // A second copy of an article is not a new article: adopt its
+            // read/star state and stay silent.
+            hasRead: copy ? item.hasRead || copy.hasRead : item.hasRead,
+            starred: copy ? item.starred || copy.starred : item.starred,
+            hidden: item.hidden,
+            notify: copy ? false : item.notify,
+            serviceRef: item.serviceRef || null,
+            linkKey: linkKey,
+        }
+    })
     // Bound SQL parameters and query construction even for large refreshes.
     const queries = []
     for (let i = 0; i < values.length; i += 50) {
@@ -383,6 +434,69 @@ export function fetchItems(
     }
 }
 
+// Every stored copy of an article shares read/star/hidden state. Without this
+// a merge would leave a stale unread copy behind that reappears as "new" once
+// the visible copy is read.
+type DuplicateChange = {
+    hasRead?: boolean
+    starred?: boolean
+    hidden?: boolean
+}
+
+function syncDuplicateCopies(
+    item: RSSItem,
+    changes: DuplicateChange
+): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        if (!duplicateFilterEnabled() || !item.linkKey) return
+        const rows = await database
+            .select({ _id: itemsTable._id })
+            .from(itemsTable)
+            .where(eq(itemsTable.linkKey, item.linkKey))
+        if (rows.length <= 1) return
+        await database
+            .update(itemsTable)
+            .set(changes)
+            .where(eq(itemsTable.linkKey, item.linkKey))
+        const state = getState()
+        let partial = false
+        for (const row of rows) {
+            const copy = state.items[row._id]
+            if (!copy) {
+                // The copy is outside the paged-in items; its source badge can
+                // only be corrected from the database.
+                partial = true
+                continue
+            }
+            if (
+                changes.hasRead !== undefined &&
+                copy.hasRead !== changes.hasRead
+            ) {
+                dispatch(
+                    changes.hasRead
+                        ? markReadDone({ ...copy, hasRead: true })
+                        : markUnreadDone({ ...copy, hasRead: false })
+                )
+            }
+            if (
+                changes.starred !== undefined &&
+                copy.starred !== changes.starred
+            ) {
+                dispatch(
+                    toggleStarredDone({ ...copy, starred: changes.starred })
+                )
+            }
+            if (
+                changes.hidden !== undefined &&
+                copy.hidden !== changes.hidden
+            ) {
+                dispatch(toggleHiddenDone({ ...copy, hidden: changes.hidden }))
+            }
+        }
+        if (partial) dispatch(updateUnreadCounts())
+    }
+}
+
 const markReadDone = (item: RSSItem): ItemActionTypes => ({
     type: MARK_READ,
     item: item,
@@ -405,6 +519,7 @@ export function markRead(item: RSSItem): AppThunk<Promise<void>> {
             if (item.serviceRef) {
                 dispatch(dispatch(getServiceHooks()).markRead?.(item))
             }
+            await dispatch(syncDuplicateCopies(item, { hasRead: true }))
         }
     }
 }
@@ -438,15 +553,41 @@ export function markAllRead(
         // unread row of those sources, while the store only holds the items the
         // current view has paged in, and undo must restore all of them.
         const affected = await database
-            .select({ _id: itemsTable._id })
+            .select({ _id: itemsTable._id, linkKey: itemsTable.linkKey })
             .from(itemsTable)
             .where(and(...conditions))
         await database
             .update(itemsTable)
             .set({ hasRead: true })
             .where(and(...conditions))
-        if (affected.length > 0) {
-            dispatch(setLastMarkAll(affected.map(row => row._id)))
+        // Copies outside these sources belong to the same articles; leaving them
+        // unread would make a merged article reappear as new elsewhere.
+        let extra: number[] = []
+        if (duplicateFilterEnabled()) {
+            const keys = Array.from(
+                new Set(affected.map(row => row.linkKey).filter(key => key))
+            )
+            if (keys.length > 0) {
+                const twins = await database
+                    .select({ _id: itemsTable._id })
+                    .from(itemsTable)
+                    .where(
+                        and(
+                            inArray(itemsTable.linkKey, keys),
+                            eq(itemsTable.hasRead, false)
+                        )
+                    )
+                await database
+                    .update(itemsTable)
+                    .set({ hasRead: true })
+                    .where(inArray(itemsTable.linkKey, keys))
+                extra = twins.map(row => row._id)
+            }
+        }
+        if (affected.length > 0 || extra.length > 0) {
+            dispatch(
+                setLastMarkAll([...affected.map(row => row._id), ...extra])
+            )
         }
         if (date) {
             dispatch({
@@ -461,6 +602,7 @@ export function markAllRead(
                 type: MARK_ALL_READ,
                 sids: sids,
             })
+            if (extra.length > 0) dispatch(updateUnreadCounts())
         }
     }
 }
@@ -492,6 +634,7 @@ export function markUnread(item: RSSItem): AppThunk<Promise<void>> {
             if (item.serviceRef) {
                 dispatch(dispatch(getServiceHooks()).markUnread?.(item))
             }
+            await dispatch(syncDuplicateCopies(item, { hasRead: false }))
         }
     }
 }
@@ -513,6 +656,7 @@ export function toggleStarred(item: RSSItem): AppThunk<Promise<void>> {
             if (item.starred) dispatch(hooks.unstar?.(item))
             else dispatch(hooks.star?.(item))
         }
+        await dispatch(syncDuplicateCopies(item, { starred: !item.starred }))
     }
 }
 
@@ -528,6 +672,7 @@ export function toggleHidden(item: RSSItem): AppThunk<Promise<void>> {
             .set({ hidden: !item.hidden })
             .where(eq(itemsTable._id, item._id))
         dispatch(toggleHiddenDone(item))
+        await dispatch(syncDuplicateCopies(item, { hidden: !item.hidden }))
     }
 }
 
