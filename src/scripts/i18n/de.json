@@ -117,6 +117,7 @@
         "app": "Einstellungen",
         "about": "Info",
         "version": "Version",
+        "localBuild": "Geänderter Build",
         "shortcuts": "Verknüpfungen",
         "openSource": "Open Source",
         "feedback": "Feedback"

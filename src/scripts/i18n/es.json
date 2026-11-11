@@ -92,6 +92,7 @@
         "app": "Preferencias",
         "about": "Acerca",
         "version": "Versión",
+        "localBuild": "Versión modificada",
         "shortcuts": "Atajos",
         "openSource": "Abrir fuente",
         "feedback": "Reacciones"

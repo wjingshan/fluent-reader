@@ -117,6 +117,7 @@
         "app": "Inställningar",
         "about": "Om",
         "version": "Version",
+        "localBuild": "Modifierad version",
         "shortcuts": "Genvägar",
         "openSource": "Open source",
         "feedback": "Återkoppling"

@@ -2,6 +2,33 @@ const HtmlWebpackPlugin = require("html-webpack-plugin")
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin")
 const { GriffelPlugin } = require("@griffel/webpack-plugin")
 const MiniCssExtractPlugin = require("mini-css-extract-plugin")
+const webpack = require("webpack")
+const { execSync } = require("child_process")
+
+// Build provenance shown on the About tab. Resolved at build time so the running
+// app can state which checkout it came from; every lookup degrades to an empty
+// string when git is unavailable (e.g. building from a tarball).
+function gitInfo() {
+    const read = args => {
+        try {
+            return execSync(`git ${args}`, {
+                cwd: __dirname,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"],
+            }).trim()
+        } catch {
+            return ""
+        }
+    }
+    return {
+        branch: read("rev-parse --abbrev-ref HEAD"),
+        commit: read("rev-parse --short HEAD"),
+        date: read("log -1 --format=%cs"),
+        dirty: read("status --porcelain --untracked-files=no") ? "1" : "",
+    }
+}
+
+const GIT = gitInfo()
 
 module.exports = [
     {
@@ -103,6 +130,12 @@ module.exports = [
             }),
             new MiniCssExtractPlugin(),
             new GriffelPlugin(),
+            new webpack.DefinePlugin({
+                __FR_GIT_BRANCH__: JSON.stringify(GIT.branch),
+                __FR_GIT_COMMIT__: JSON.stringify(GIT.commit),
+                __FR_GIT_DATE__: JSON.stringify(GIT.date),
+                __FR_GIT_DIRTY__: JSON.stringify(GIT.dirty),
+            }),
         ],
     },
 ]

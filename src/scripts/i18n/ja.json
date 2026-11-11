@@ -117,6 +117,7 @@
         "app": "環境設定",
         "about": "本アプリについて",
         "version": "バージョン",
+        "localBuild": "改変版",
         "shortcuts": "ショートカット",
         "openSource": "オープンソース",
         "feedback": "フィードバック"

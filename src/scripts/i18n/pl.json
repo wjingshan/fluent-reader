@@ -123,6 +123,7 @@
         "app": "Preferencje",
         "about": "O aplikacji",
         "version": "Wersja",
+        "localBuild": "Zmodyfikowana kompilacja",
         "shortcuts": "Skróty klawiszowe",
         "openSource": "Otwarte źródło",
         "feedback": "Opinie"

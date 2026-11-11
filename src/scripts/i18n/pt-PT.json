@@ -123,6 +123,7 @@
         "app": "Preferências",
         "about": "Sobre",
         "version": "Versão",
+        "localBuild": "Versão modificada",
         "shortcuts": "Atalhos",
         "openSource": "Código aberto",
         "feedback": "Feedback"

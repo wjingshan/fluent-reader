@@ -117,6 +117,7 @@
         "app": "Tercihler",
         "about": "Hakkında",
         "version": "Sürüm",
+        "localBuild": "Değiştirilmiş sürüm",
         "shortcuts": "Kısayollar",
         "openSource": "Açık Kaynak",
         "feedback": "Geri Bildirim"

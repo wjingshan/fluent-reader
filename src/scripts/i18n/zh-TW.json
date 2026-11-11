@@ -121,6 +121,7 @@
         "app": "應用偏好",
         "about": "關於",
         "version": "版本",
+        "localBuild": "修改版",
         "shortcuts": "快捷鍵",
         "openSource": "開源項目",
         "feedback": "反饋"

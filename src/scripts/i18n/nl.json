@@ -117,6 +117,7 @@
         "app": "Instellingen",
         "about": "Over",
         "version": "Versie",
+        "localBuild": "Aangepaste build",
         "shortcuts": "Sneltoetsen",
         "openSource": "Open source",
         "feedback": "Feedback"
