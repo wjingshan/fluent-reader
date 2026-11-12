@@ -129,6 +129,12 @@ const utilsBridge = {
     isMaximized: () => {
         return ipcRenderer.sendSync("is-maximized") as boolean
     },
+    toggleAlwaysOnTop: (): Promise<boolean> => {
+        return ipcRenderer.invoke("toggle-always-on-top")
+    },
+    isAlwaysOnTop: () => {
+        return ipcRenderer.sendSync("is-always-on-top") as boolean
+    },
     isFullscreen: () => {
         return ipcRenderer.sendSync("is-fullscreen") as boolean
     },
@@ -167,6 +173,10 @@ const utilsBridge = {
         ipcRenderer.removeAllListeners("window-blur")
         ipcRenderer.on("window-blur", () => {
             callback(WindowStateListenerType.Focused, false)
+        })
+        ipcRenderer.removeAllListeners("always-on-top")
+        ipcRenderer.on("always-on-top", (_, state: boolean) => {
+            callback(WindowStateListenerType.AlwaysOnTop, state)
         })
     },
 

@@ -92,6 +92,10 @@ const Nav: React.FC = () => {
     const [isFullscreen, setIsFullscreen] = useState(() =>
         globalThis.utils.isFullscreen()
     )
+    // Mirror of the main process state; the renderer never owns this flag.
+    const [alwaysOnTop, setAlwaysOnTopState] = useState(() =>
+        globalThis.utils.isAlwaysOnTop()
+    )
     const isDarwin = globalThis.utils.platform === "darwin"
 
     const setBodyFullscreenState = useCallback((fullscreen: boolean) => {
@@ -117,6 +121,9 @@ const Nav: React.FC = () => {
                         )
                     )
                     break
+                case WindowStateListenerType.AlwaysOnTop:
+                    setAlwaysOnTopState(windowState)
+                    break
             }
         },
         [setBodyFullscreenState]
@@ -141,6 +148,10 @@ const Nav: React.FC = () => {
     const settings = useCallback(() => dispatch(toggleSettings()), [dispatch])
     const markAll = useCallback(() => dispatch(openMarkAllMenu()), [dispatch])
     const markAllDirect = useCallback(() => dispatch(markAllRead()), [dispatch])
+    const pin = useCallback(() => {
+        // The returned value is read back from the window itself.
+        globalThis.utils.toggleAlwaysOnTop().then(setAlwaysOnTopState)
+    }, [])
     const views = useCallback(() => {
         if (state.contextMenu.event !== "#view-toggle") {
             dispatch(openViewMenu())
@@ -269,6 +280,26 @@ const Nav: React.FC = () => {
                 <FlatButtonGroup styleClass={classes.navGroupRight}>
                     {isNonNavButtonShown && (
                         <>
+                            <FlatButton
+                                styleClass={classes.navBtn}
+                                id="pin-toggle"
+                                onClick={pin}
+                                title={
+                                    alwaysOnTop
+                                        ? intl.get("nav.unpin")
+                                        : intl.get("nav.pin")
+                                }>
+                                <Icon
+                                    iconName={
+                                        alwaysOnTop ? "PinnedFill" : "Pin"
+                                    }
+                                    style={
+                                        alwaysOnTop
+                                            ? { color: "var(--primary)" }
+                                            : undefined
+                                    }
+                                />
+                            </FlatButton>
                             <FlatButton
                                 styleClass={classes.navBtn}
                                 fetching={isFetching}

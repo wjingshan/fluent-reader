@@ -39,6 +39,8 @@
     "nav": {
         "menu": "Menu",
         "refresh": "Refresh",
+        "pin": "Pin window",
+        "unpin": "Unpin window",
         "markAllRead": "Mark all as read",
         "notifications": "Notifications",
         "view": "View",

@@ -39,6 +39,8 @@
     "nav": {
         "menu": "菜单",
         "refresh": "刷新",
+        "pin": "置顶窗口",
+        "unpin": "取消置顶",
         "markAllRead": "全部标为已读",
         "notifications": "消息",
         "view": "视图",

@@ -21,9 +21,19 @@ export function setUtilsListeners(manager: WindowManager) {
             if (background && process.platform === "darwin") {
                 shell.openExternal(url, { activate: false })
             } else if (background && manager.hasWindow()) {
-                manager.mainWindow.setAlwaysOnTop(true)
+                // Raise the window above the browser for a moment, then put
+                // the pin state back exactly as the user had it. These calls
+                // bypass manager.setAlwaysOnTop so the toolbar state, which
+                // follows the user's pin state, does not flicker.
+                const win = manager.mainWindow
+                const wasOnTop = win.isAlwaysOnTop()
+                win.setAlwaysOnTop(true, "floating")
                 await shell.openExternal(url)
-                setTimeout(() => manager.mainWindow.setAlwaysOnTop(false), 1000)
+                setTimeout(() => {
+                    if (!wasOnTop && !win.isDestroyed()) {
+                        win.setAlwaysOnTop(false, "floating")
+                    }
+                }, 1000)
             } else {
                 shell.openExternal(url)
             }
@@ -290,6 +300,14 @@ export function setUtilsListeners(manager: WindowManager) {
         manager.zoom()
     })
 
+    ipcMain.handle("toggle-always-on-top", () => {
+        return manager.toggleAlwaysOnTop()
+    })
+
+    ipcMain.on("is-always-on-top", event => {
+        event.returnValue = manager.isAlwaysOnTop()
+    })
+
     ipcMain.on("is-maximized", event => {
         event.returnValue =
             Boolean(manager.mainWindow) && manager.mainWindow.isMaximized()
@@ -310,8 +328,10 @@ export function setUtilsListeners(manager: WindowManager) {
             const win = manager.mainWindow
             if (win.isMinimized()) win.restore()
             if (process.platform === "win32") {
-                win.setAlwaysOnTop(true)
-                win.setAlwaysOnTop(false)
+                // Bump the window to the top, then restore the pin state.
+                const wasOnTop = win.isAlwaysOnTop()
+                win.setAlwaysOnTop(true, "floating")
+                win.setAlwaysOnTop(wasOnTop, "floating")
             }
             win.focus()
         }

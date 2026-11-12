@@ -39,6 +39,8 @@
     "nav": {
         "menu": "選單",
         "refresh": "重新整理",
+        "pin": "置頂視窗",
+        "unpin": "取消置頂",
         "markAllRead": "全部標為已讀",
         "notifications": "訊息",
         "view": "檢視",

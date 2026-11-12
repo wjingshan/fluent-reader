@@ -117,4 +117,24 @@ export class WindowManager {
     hasWindow = () => {
         return this.mainWindow !== null && !this.mainWindow.isDestroyed()
     }
+
+    isAlwaysOnTop = () => {
+        return this.hasWindow() && this.mainWindow.isAlwaysOnTop()
+    }
+
+    // The main process owns the "always on top" state: the renderer never keeps
+    // its own copy, it re-reads this value and follows the pushed event.
+    setAlwaysOnTop = (on: boolean) => {
+        if (!this.hasWindow()) return false
+        this.mainWindow.setAlwaysOnTop(on, "floating")
+        const state = this.mainWindow.isAlwaysOnTop()
+        if (!this.mainWindow.webContents.isDestroyed()) {
+            this.mainWindow.webContents.send("always-on-top", state)
+        }
+        return state
+    }
+
+    toggleAlwaysOnTop = () => {
+        return this.setAlwaysOnTop(!this.isAlwaysOnTop())
+    }
 }
