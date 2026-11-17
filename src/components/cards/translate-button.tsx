@@ -2,7 +2,6 @@ import * as React from "react"
 import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
-import { Tooltip } from "@fluentui/react-components"
 import { RSSItem } from "../../scripts/models/item"
 import {
     clearTranslationError,
@@ -84,18 +83,12 @@ const TranslateButton: React.FunctionComponent<{ item: RSSItem }> = props => {
     const loading = record?.status === "loading"
     const failed = record?.status === "error"
     const translated = Boolean(record?.showTranslation)
-    const [errorOpen, setErrorOpen] = useState(false)
 
     useEffect(() => {
-        if (!failed) {
-            setErrorOpen(false)
-            return
-        }
-        // Show the reason without requiring a hover, then leave the button idle
-        // again so the next click simply retries.
-        setErrorOpen(true)
+        if (!failed) return
+        // Leave the button idle again so the next click simply retries. The
+        // reason itself stays in the native title attribute.
         const timer = setTimeout(() => {
-            setErrorOpen(false)
             clearTranslationError(props.item._id)
         }, ERROR_VISIBLE_MS)
         return () => clearTimeout(timer)
@@ -109,46 +102,46 @@ const TranslateButton: React.FunctionComponent<{ item: RSSItem }> = props => {
         ? intl.get("translate.showOriginal")
         : intl.get("translate.action")
 
+    // Deliberately a native title instead of a Fluent UI tooltip: this project
+    // uses Fluent v8, and a v9 <Tooltip> without a provider mounts a full-screen
+    // FluentProvider (z-index 1000000, pointer-events auto) per card, which
+    // swallows every real mouse click in the window.
     return (
-        <Tooltip
-            content={hint}
-            relationship="description"
-            positioning="above-start"
-            visible={failed ? errorOpen : undefined}
-            withArrow>
-            <button
-                type="button"
-                className={mergeClasses(
-                    classes.button,
-                    translated && classes.active,
-                    loading && classes.loading,
-                    failed && classes.failed
-                )}
-                aria-label={hint}
-                onClick={event => {
-                    // Keep the click away from the card: it would open the
-                    // article, mark it read and steal the selection.
-                    event.preventDefault()
-                    event.stopPropagation()
-                    if (!loading) toggleTranslation(props.item)
-                }}
-                onMouseUp={event => {
-                    // Right click still reaches the card's own context menu.
-                    if (event.button === 2) return
-                    event.preventDefault()
-                    event.stopPropagation()
-                }}
-                onDoubleClick={event => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                }}>
-                {loading
-                    ? "…"
-                    : translated
-                    ? intl.get("translate.glyphActive")
-                    : intl.get("translate.glyphIdle")}
-            </button>
-        </Tooltip>
+        <button
+            type="button"
+            title={hint}
+            aria-label={hint}
+            className={mergeClasses(
+                classes.button,
+                translated && classes.active,
+                loading && classes.loading,
+                failed && classes.failed
+            )}
+            onClick={event => {
+                // Keep the click away from the card: it would open the
+                // article, mark it read and steal the selection.
+                event.preventDefault()
+                event.stopPropagation()
+                if (!loading) toggleTranslation(props.item)
+            }}
+            onMouseUp={event => {
+                // Right click still reaches the card's own context menu.
+                if (event.button === 2) return
+                event.preventDefault()
+                event.stopPropagation()
+            }}
+            onDoubleClick={event => {
+                event.preventDefault()
+                event.stopPropagation()
+            }}>
+            {loading
+                ? "…"
+                : failed
+                ? "!"
+                : translated
+                ? intl.get("translate.glyphActive")
+                : intl.get("translate.glyphIdle")}
+        </button>
     )
 }
 
