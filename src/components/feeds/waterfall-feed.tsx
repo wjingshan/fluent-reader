@@ -101,42 +101,52 @@ function mediaOf(item: RSSItem): WaterfallMedia[] {
     const content = item.content || ""
     const base = baseFor(item.link || "")
     const out: WaterfallMedia[] = []
-    // Separate sets on purpose: a post's still and its clip share a basename
-    // ("static/xxx.jpg" vs "webm/xxx.webm"), and collapsing those would hide the
-    // clip. Within one kind, webm and mp4 of the same clip still collapse.
     const seenImage = new Set<string>()
-    const seenVideo = new Set<string>()
-    if (content.indexOf("<img") >= 0 || content.indexOf("<video") >= 0) {
-        const doc = new DOMParser().parseFromString(content, "text/html")
-        for (const img of Array.from(doc.querySelectorAll("img"))) {
-            const resolved = absoluteUrl(img.getAttribute("src"), base)
-            if (!resolved) continue
-            const key = mediaKey(resolved)
-            if (seenImage.has(key)) continue
-            seenImage.add(key)
-            out.push({ kind: "image", url: resolved })
-        }
-        for (const node of Array.from(
-            doc.querySelectorAll("video, video > source")
-        )) {
-            const resolved = absoluteUrl(
-                node.getAttribute("src") || node.getAttribute("data-src"),
-                base
-            )
-            if (!resolved || !MEDIA_EXT.test(resolved)) continue
-            const key = mediaKey(resolved)
-            if (seenVideo.has(key)) continue
-            seenVideo.add(key)
-            out.push({
-                kind: "video",
-                url: resolved,
-                poster: absoluteUrl(
-                    (node.closest("video") || node).getAttribute("poster"),
-                    base
-                ),
-            })
-        }
+    if (content.indexOf("<img") < 0 && content.indexOf("<video") < 0) {
+        return item.thumb ? [{ kind: "image", url: item.thumb }] : []
     }
+
+    const doc = new DOMParser().parseFromString(content, "text/html")
+
+    // Clips first: a post that shows a clip usually also carries its poster as
+    // a plain <img> under the same basename ("static/x.jpg" next to "webm/x.webm").
+    // Counting both would make one clip look like two identical items, so the
+    // still is dropped whenever a clip of the same name exists. webm and mp4 of
+    // one clip still collapse into a single entry.
+    const clips: WaterfallMedia[] = []
+    const clipKeys = new Set<string>()
+    for (const node of Array.from(
+        doc.querySelectorAll("video, video > source")
+    )) {
+        const resolved = absoluteUrl(
+            node.getAttribute("src") || node.getAttribute("data-src"),
+            base
+        )
+        if (!resolved || !MEDIA_EXT.test(resolved)) continue
+        const key = mediaKey(resolved)
+        if (clipKeys.has(key)) continue
+        clipKeys.add(key)
+        clips.push({
+            kind: "video",
+            url: resolved,
+            poster: absoluteUrl(
+                (node.closest("video") || node).getAttribute("poster"),
+                base
+            ),
+        })
+    }
+
+    for (const img of Array.from(doc.querySelectorAll("img"))) {
+        const resolved = absoluteUrl(img.getAttribute("src"), base)
+        if (!resolved) continue
+        const key = mediaKey(resolved)
+        if (clipKeys.has(key)) continue // this is the clip's poster
+        if (seenImage.has(key)) continue
+        seenImage.add(key)
+        out.push({ kind: "image", url: resolved })
+    }
+
+    out.push(...clips)
     if (out.length === 0 && item.thumb)
         out.push({ kind: "image", url: item.thumb })
     return out.slice(0, MAX_TILES_PER_ITEM)
