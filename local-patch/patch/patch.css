@@ -1,0 +1,175 @@
+/* patch.css — media badge + hover-to-play layer for every card layout. */
+
+/* The card views lift the picture on hover; keep it still while a video plays. */
+.default-card.fr-media:hover img.head,
+.default-card.fr-media:hover h3.title,
+.default-card.fr-media:hover p.snippet {
+    transform: none !important;
+}
+
+/* The video covers whatever area the card gives its picture: the 144px header
+   of the card views, or the whole tile in the waterfall view. */
+.fr-media > video.fr-zoom {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 144px;
+    object-fit: cover;
+    z-index: 4;
+    opacity: 0;
+    background: #000;
+    transition: opacity linear 0.12s;
+    pointer-events: none;
+}
+
+/* a waterfall tile is one picture edge to edge, so the video covers it all */
+[data-fr-wf] > video.fr-zoom {
+    height: 100%;
+}
+
+.fr-media.fr-hover > video.fr-zoom {
+    opacity: 1;
+}
+
+.fr-media.fr-video-broken > video.fr-zoom {
+    display: none;
+}
+
+.fr-media-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 6;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    border-radius: 9px;
+    background: #000b;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Hover-revealed action button, bottom-right so it never covers the media. */
+.fr-has-eagle > button.fr-eagle-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #000000b3;
+    color: #fff;
+    font-size: 14px;
+    line-height: 28px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    z-index: 7;
+    transition: opacity linear 0.12s, background linear 0.12s;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* A waterfall tile puts it top-left, where the caption gradient never reaches. */
+[data-fr-wf].fr-has-eagle > button.fr-eagle-btn {
+    left: 8px;
+    top: 8px;
+    right: auto;
+    bottom: auto;
+}
+
+.fr-has-eagle:hover > button.fr-eagle-btn {
+    opacity: 1;
+}
+
+.fr-has-eagle > button.fr-eagle-btn:hover {
+    background: #000000e6;
+}
+
+.fr-has-eagle > button.fr-eagle-btn.busy {
+    opacity: 1;
+}
+
+/* the face slot holds either the SVG icon or a short status glyph */
+.fr-has-eagle > button.fr-eagle-btn > .fr-eagle-face {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.fr-has-eagle > button.fr-eagle-btn > .fr-eagle-face.text {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.fr-has-eagle > button.fr-eagle-btn svg.fr-eagle-svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* ------------------------------------------------------- refresh feedback */
+/* A short-lived message after a manual refresh, so "fetched but nothing new"
+   is visible instead of looking like the click did nothing. */
+.fr-toast-host {
+    position: fixed;
+    top: 44px;
+    right: 16px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.fr-toast {
+    max-width: 320px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    background: #000000d9;
+    color: #ffffff;
+    font-size: 13px;
+    line-height: 18px;
+    box-shadow: #0006 0 4px 16px;
+    animation: fr-toast-in 0.16s ease-out;
+    transition: opacity 0.3s linear, transform 0.3s ease-out;
+    user-select: none;
+}
+
+.fr-toast.ok {
+    border-left: 3px solid #6bb700;
+}
+
+.fr-toast.empty {
+    border-left: 3px solid #ffaa44;
+}
+
+.fr-toast.out {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+@keyframes fr-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}

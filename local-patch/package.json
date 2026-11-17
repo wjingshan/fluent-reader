@@ -1,0 +1,13 @@
+{
+    "name": "fluent-reader-local-patch",
+    "private": true,
+    "version": "1.0.0",
+    "description": "Injects the media/Eagle patch into an installed Fluent Reader app.asar",
+    "type": "module",
+    "scripts": {
+        "install-deps": "npm install"
+    },
+    "dependencies": {
+        "@electron/asar": "^3.2.10"
+    }
+}
