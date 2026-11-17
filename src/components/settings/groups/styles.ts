@@ -1,5 +1,7 @@
 import { makeStyles, tokens } from "@fluentui/react-components"
 
+/* Flipping a row mid-drag is drawn by the reorder hook straight onto the row
+   element, so the only drag style that lives here is the resting cursor. */
 export const useGroupStyles = makeStyles({
     row: { display: "flex", gap: "8px", alignItems: "flex-start" },
     grow: { flex: 1, minWidth: 0 },

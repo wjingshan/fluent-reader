@@ -13,6 +13,7 @@ import {
 } from "@fluentui/react-components"
 import { Image16Regular } from "@fluentui/react-icons"
 import { RSSSource } from "../../../scripts/models/source"
+import { moveItems, useRowReorder } from "../../utils/hooks/useRowReorder"
 import { useGroupStyles } from "./styles"
 
 const useStyles = makeStyles({
@@ -38,7 +39,7 @@ export function GroupSourceList({
 }: GroupSourceListProps) {
     const classes = useGroupStyles()
     const styles = useStyles()
-    const dragged = useRef<number[]>([])
+    const scroller = useRef<HTMLDivElement>(null)
     const selectionAnchor = useRef<number>(null)
     const columns = useMemo(
         () => [
@@ -76,6 +77,25 @@ export function GroupSourceList({
             ? styles.nameColumn
             : undefined
 
+    const reorder = useRowReorder({
+        containerRef: scroller,
+        itemCount: sources.length,
+        disabled,
+        onReorder: (from, insertAt) =>
+            onReorder(
+                moveItems(
+                    sources.map(source => source.sid),
+                    from,
+                    insertAt
+                )
+            ),
+    })
+    const selectedIndices = sources.reduce(
+        (indices, source, index) =>
+            selected.has(source.sid) ? [...indices, index] : indices,
+        [] as number[]
+    )
+
     function selectSource(
         event: React.MouseEvent,
         sid: number,
@@ -106,26 +126,8 @@ export function GroupSourceList({
         onSelect(next)
     }
 
-    function reorder(index: number) {
-        const sids = dragged.current
-        dragged.current = []
-        if (disabled || !sids.length || sids.includes(sources[index]?.sid))
-            return
-        const next = sources
-            .map(source => source.sid)
-            .filter(sid => !sids.includes(sid))
-        next.splice(index, 0, ...sids)
-        onReorder(next)
-    }
-
     return (
-        <div
-            className={classes.grid}
-            onDragOver={event => event.preventDefault()}
-            onDrop={event => {
-                event.preventDefault()
-                reorder(sources.length)
-            }}>
+        <div className={classes.grid} ref={scroller}>
             <DataGrid
                 size="small"
                 items={sources}
@@ -154,59 +156,49 @@ export function GroupSourceList({
                     </DataGridRow>
                 </DataGridHeader>
                 <DataGridBody<RSSSource>>
-                    {({ item }) => (
-                        <DataGridRow<RSSSource>
-                            key={item.sid}
-                            className={classes.draggable}
-                            draggable={!disabled}
-                            selectionCell={{
-                                checkboxIndicator: { "aria-label": item.name },
-                                onClick: event => {
-                                    event.stopPropagation()
-                                    selectSource(event, item.sid, true)
-                                },
-                            }}
-                            onClick={event => selectSource(event, item.sid)}
-                            onDragStart={event => {
-                                dragged.current = selected.has(item.sid)
-                                    ? sources
-                                          .filter(source =>
-                                              selected.has(source.sid)
-                                          )
-                                          .map(source => source.sid)
-                                    : [item.sid]
-                                event.dataTransfer.effectAllowed = "move"
-                                event.dataTransfer.setData(
-                                    "text/plain",
-                                    String(item.sid)
-                                )
-                            }}
-                            onDragEnd={() => {
-                                dragged.current = []
-                            }}
-                            onDragOver={event => event.preventDefault()}
-                            onDrop={event => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                reorder(
-                                    sources.findIndex(
-                                        source => source.sid === item.sid
+                    {({ item }) => {
+                        const index = sources.indexOf(item)
+                        return (
+                            <DataGridRow<RSSSource>
+                                key={item.sid}
+                                className={classes.draggable}
+                                selectionCell={{
+                                    checkboxIndicator: {
+                                        "aria-label": item.name,
+                                    },
+                                    onClick: event => {
+                                        event.stopPropagation()
+                                        selectSource(event, item.sid, true)
+                                    },
+                                }}
+                                onClick={event => selectSource(event, item.sid)}
+                                onPointerDown={event => {
+                                    if (disabled) return
+                                    // dragging a selected row carries the whole
+                                    // selection; dragging an unselected one only
+                                    // moves itself
+                                    reorder.start(
+                                        event,
+                                        index,
+                                        selected.has(item.sid)
+                                            ? selectedIndices
+                                            : []
                                     )
-                                )
-                            }}>
-                            {({ columnId, renderCell }) => (
-                                <DataGridCell
-                                    className={columnClass(columnId)}
-                                    role={
-                                        columnId === "name"
-                                            ? "rowheader"
-                                            : "gridcell"
-                                    }>
-                                    {renderCell(item)}
-                                </DataGridCell>
-                            )}
-                        </DataGridRow>
-                    )}
+                                }}>
+                                {({ columnId, renderCell }) => (
+                                    <DataGridCell
+                                        className={columnClass(columnId)}
+                                        role={
+                                            columnId === "name"
+                                                ? "rowheader"
+                                                : "gridcell"
+                                        }>
+                                        {renderCell(item)}
+                                    </DataGridCell>
+                                )}
+                            </DataGridRow>
+                        )
+                    }}
                 </DataGridBody>
             </DataGrid>
         </div>

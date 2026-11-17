@@ -13,6 +13,7 @@ import {
 } from "@fluentui/react-components"
 import { SourceGroup } from "../../../schema-types"
 import { SourceState } from "../../../scripts/models/source"
+import { moveItems, useRowReorder } from "../../utils/hooks/useRowReorder"
 import { useGroupStyles } from "./styles"
 
 const useStyles = makeStyles({
@@ -40,7 +41,7 @@ export function GroupList({
 }: GroupListProps) {
     const classes = useGroupStyles()
     const styles = useStyles()
-    const dragged = useRef<number>(null)
+    const scroller = useRef<HTMLDivElement>(null)
     const name = (group: SourceGroup) =>
         group.isMultiple ? group.name : sources[group.sids[0]]?.name || ""
     const columns = useMemo(
@@ -68,25 +69,18 @@ export function GroupList({
         [sources]
     )
 
-    function reorder(index: number) {
-        const gid = dragged.current
-        dragged.current = null
-        const group = groups.find(group => group.gid === gid)
-        if (disabled || !group || groups[index]?.gid === gid) return
-        const next = groups.filter(group => group.gid !== gid)
-        next.splice(index, 0, group)
-        onReorder(next)
-        onSelect(null)
-    }
+    const reorder = useRowReorder({
+        containerRef: scroller,
+        itemCount: groups.length,
+        disabled,
+        onReorder: (from, insertAt) => {
+            onReorder(moveItems(groups, from, insertAt))
+            onSelect(null)
+        },
+    })
 
     return (
-        <div
-            className={classes.grid}
-            onDragOver={event => event.preventDefault()}
-            onDrop={event => {
-                event.preventDefault()
-                reorder(groups.length)
-            }}>
+        <div className={classes.grid} ref={scroller}>
             <DataGrid
                 size="small"
                 items={groups}
@@ -116,68 +110,52 @@ export function GroupList({
                     </DataGridRow>
                 </DataGridHeader>
                 <DataGridBody<SourceGroup>>
-                    {({ item }) => (
-                        <DataGridRow<SourceGroup>
-                            key={item.gid}
-                            className={classes.draggable}
-                            draggable={!disabled}
-                            selectionCell={{
-                                radioIndicator: {
-                                    "aria-label": name(item),
-                                },
-                            }}
-                            onDoubleClick={() => {
-                                if (!disabled && item.isMultiple)
-                                    onEdit(item.gid)
-                            }}
-                            onKeyDown={event => {
-                                if (
-                                    event.key === "Enter" &&
-                                    !disabled &&
-                                    item.isMultiple
-                                ) {
-                                    event.preventDefault()
-                                    onEdit(item.gid)
+                    {({ item }) => {
+                        const index = groups.indexOf(item)
+                        return (
+                            <DataGridRow<SourceGroup>
+                                key={item.gid}
+                                className={classes.draggable}
+                                selectionCell={{
+                                    radioIndicator: {
+                                        "aria-label": name(item),
+                                    },
+                                }}
+                                onPointerDown={event =>
+                                    !disabled && reorder.start(event, index)
                                 }
-                            }}
-                            onDragStart={event => {
-                                dragged.current = item.gid
-                                event.dataTransfer.effectAllowed = "move"
-                                event.dataTransfer.setData(
-                                    "text/plain",
-                                    String(item.gid)
-                                )
-                            }}
-                            onDragEnd={() => {
-                                dragged.current = null
-                            }}
-                            onDragOver={event => event.preventDefault()}
-                            onDrop={event => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                reorder(
-                                    groups.findIndex(
-                                        group => group.gid === item.gid
-                                    )
-                                )
-                            }}>
-                            {({ columnId, renderCell }) => (
-                                <DataGridCell
-                                    className={
-                                        columnId !== "name"
-                                            ? styles.narrow
-                                            : undefined
+                                onDoubleClick={() => {
+                                    if (!disabled && item.isMultiple)
+                                        onEdit(item.gid)
+                                }}
+                                onKeyDown={event => {
+                                    if (
+                                        event.key === "Enter" &&
+                                        !disabled &&
+                                        item.isMultiple
+                                    ) {
+                                        event.preventDefault()
+                                        onEdit(item.gid)
                                     }
-                                    role={
-                                        columnId === "name"
-                                            ? "rowheader"
-                                            : "gridcell"
-                                    }>
-                                    {renderCell(item)}
-                                </DataGridCell>
-                            )}
-                        </DataGridRow>
-                    )}
+                                }}>
+                                {({ columnId, renderCell }) => (
+                                    <DataGridCell
+                                        className={
+                                            columnId !== "name"
+                                                ? styles.narrow
+                                                : undefined
+                                        }
+                                        role={
+                                            columnId === "name"
+                                                ? "rowheader"
+                                                : "gridcell"
+                                        }>
+                                        {renderCell(item)}
+                                    </DataGridCell>
+                                )}
+                            </DataGridRow>
+                        )
+                    }}
                 </DataGridBody>
             </DataGrid>
         </div>
