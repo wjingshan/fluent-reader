@@ -97,6 +97,20 @@ const useStyles = makeStyles({
         color: "#ffaa44",
         flexShrink: 0,
     },
+    // Later pictures of a multi-picture article: the title lives on the first
+    // tile only, so these carry a quiet position marker instead of repeating it.
+    pageBadge: {
+        position: "absolute",
+        top: "6px",
+        right: "6px",
+        padding: "1px 6px",
+        borderRadius: "8px",
+        backgroundColor: "#000000a6",
+        color: "#ffffff",
+        fontSize: "11px",
+        lineHeight: "16px",
+        pointerEvents: "none",
+    },
     textCard: {
         padding: "12px",
         height: "100%",
@@ -126,6 +140,11 @@ const useStyles = makeStyles({
 })
 
 export type WaterfallCardProps = Card.Props & {
+    // Which picture of the article this tile shows. Falls back to the stored
+    // thumbnail so single-picture articles keep working unchanged.
+    imageUrl?: string | null
+    imageIndex?: number
+    imageCount?: number
     onRatio: (ratio: number) => void
     style?: React.CSSProperties
 }
@@ -133,6 +152,10 @@ export type WaterfallCardProps = Card.Props & {
 const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
     const styles = useStyles()
     const { item, source } = props
+    const imageUrl = props.imageUrl || item.thumb
+    const imageIndex = props.imageIndex || 0
+    const imageCount = props.imageCount || 1
+    const firstOfArticle = imageIndex === 0
 
     // The tile height already follows the picture's own aspect ratio, so the
     // picture just fills the tile; only the ratio itself has to be reported.
@@ -145,6 +168,18 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
     const unread = !item.hasRead
     const starred = item.starred
 
+    const meta = (
+        <>
+            {source.iconurl ? (
+                <img className={styles.favicon} src={source.iconurl} />
+            ) : null}
+            <span className={styles.subName}>{source.name}</span>
+            {unread ? <span className={styles.unread} /> : null}
+            {starred ? <span className={styles.starred}>★</span> : null}
+            <Time date={item.date} />
+        </>
+    )
+
     return (
         <div
             className={mergeClasses(
@@ -156,39 +191,30 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
             data-fr-wf=""
             data-is-focusable
             style={props.style}>
-            {item.thumb ? (
+            {imageUrl ? (
                 <div className={styles.thumb}>
                     <img
                         className={styles.image}
-                        src={item.thumb}
+                        src={imageUrl}
                         loading="lazy"
                         onLoad={handleLoad}
                     />
-                    <div className={styles.overlay}>
-                        <h3 className={styles.title}>
-                            <Highlights
-                                text={item.title}
-                                filter={props.filter}
-                                title
-                            />
-                        </h3>
-                        <div className={styles.sub}>
-                            {source.iconurl ? (
-                                <img
-                                    className={styles.favicon}
-                                    src={source.iconurl}
+                    {firstOfArticle ? (
+                        <div className={styles.overlay}>
+                            <h3 className={styles.title}>
+                                <Highlights
+                                    text={item.title}
+                                    filter={props.filter}
+                                    title
                                 />
-                            ) : null}
-                            <span className={styles.subName}>
-                                {source.name}
-                            </span>
-                            {unread ? <span className={styles.unread} /> : null}
-                            {starred ? (
-                                <span className={styles.starred}>★</span>
-                            ) : null}
-                            <Time date={item.date} />
+                            </h3>
+                            <div className={styles.sub}>{meta}</div>
                         </div>
-                    </div>
+                    ) : (
+                        <span className={styles.pageBadge}>
+                            {imageIndex + 1}/{imageCount}
+                        </span>
+                    )}
                 </div>
             ) : (
                 <div className={styles.textCard}>
@@ -199,20 +225,7 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                             title
                         />
                     </h3>
-                    <div className={styles.textSub}>
-                        {source.iconurl ? (
-                            <img
-                                className={styles.favicon}
-                                src={source.iconurl}
-                            />
-                        ) : null}
-                        <span className={styles.subName}>{source.name}</span>
-                        {unread ? <span className={styles.unread} /> : null}
-                        {starred ? (
-                            <span className={styles.starred}>★</span>
-                        ) : null}
-                        <Time date={item.date} />
-                    </div>
+                    <div className={styles.textSub}>{meta}</div>
                 </div>
             )}
         </div>
