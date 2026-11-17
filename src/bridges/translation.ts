@@ -1,9 +1,18 @@
 import { ipcRenderer } from "electron"
-import { TranslationKeyState, TranslationResult } from "../schema-types"
+import {
+    TranslationBlocksResult,
+    TranslationKeyState,
+    TranslationResult,
+} from "../schema-types"
 
 const translationBridge = {
     translate: (title: string, snippet: string): Promise<TranslationResult> => {
         return ipcRenderer.invoke("translate-text", title, snippet)
+    },
+
+    // Article bodies: one request per batch of chunks, in order.
+    translateBlocks: (blocks: string[]): Promise<TranslationBlocksResult> => {
+        return ipcRenderer.invoke("translate-blocks", blocks)
     },
 
     getApiKey: (): Promise<TranslationKeyState> => {

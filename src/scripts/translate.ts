@@ -127,7 +127,11 @@ export function clearTranslationError(id: number) {
     }
 }
 
-export function translationMessage(record: TranslationRecord): string {
+// Shared by the card buttons and the article toolbar, which cache their
+// failures separately but speak the same vocabulary.
+export function translationMessage(
+    record: { code?: string; message?: string } | undefined
+): string {
     switch (record?.code) {
         case "no-key":
             return intl.get("translate.noKey")

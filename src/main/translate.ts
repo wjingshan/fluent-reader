@@ -1,6 +1,7 @@
 import { ipcMain, net } from "electron"
 import { store } from "./settings"
 import {
+    TranslationBlocksResult,
     TranslationError,
     TranslationKeyState,
     TranslationResult,
@@ -23,6 +24,21 @@ const SYSTEM_PROMPT = [
         SEPARATOR +
         "，分隔符之前是标题，之后是摘要。",
     "必须原样保留这一行分隔符，不要翻译、删除或改写它。",
+].join("\n")
+
+// Article bodies arrive as many chunks, because a whole page would blow past
+// the request budget. Each chunk is one line of the payload.
+const CHUNK_SEPARATOR = "<<<FR_TRANSLATE_CHUNK>>>"
+
+// The renderer marks every inline element boundary with a numbered placeholder
+// (`⟦3⟧` opens, `⟦/3⟧` closes), so the model translates running text while the
+// original tag structure is rebuilt around the translation afterwards.
+const BLOCK_PROMPT = [
+    "把下面这段网页正文翻译成简体中文。只输出译文，保留原有标点和换行，不要解释。",
+    "每段文字之间有一行分隔符 " +
+        CHUNK_SEPARATOR +
+        "，分隔符之前是第一段，之后是下一段。必须原样保留每一行分隔符，不要翻译、删除或改写它，输出的段数必须与输入相同。",
+    "文字中可能出现形如 ⟦3⟧ 与 ⟦/3⟧ 的标记，它们是网页标签的占位符。把标记原样留在原来的位置，只翻译标记之外的文字；不要新增、删除、合并或调换任何标记。",
 ].join("\n")
 
 type ChatResponse = {
@@ -89,12 +105,13 @@ async function withDeadline<T>(
 
 async function requestTranslation(
     key: string,
-    content: string
+    content: string,
+    systemPrompt: string = SYSTEM_PROMPT
 ): Promise<RawText> {
     const body = {
         model: MODEL,
         messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: systemPrompt },
             { role: "user", content: content },
         ],
         // Thinking mode rejects sampling parameters, so none are sent.
@@ -202,6 +219,39 @@ async function translate(
     return { title: "", snippet: singleSnippet.text || "" }
 }
 
+async function translateBlocks(
+    key: string,
+    blocks: string[]
+): Promise<TranslationBlocksResult> {
+    if (blocks.length === 1) {
+        const single = await requestTranslation(key, blocks[0], BLOCK_PROMPT)
+        if (single.error) return { blocks: [], error: single.error }
+        return { blocks: [single.text || ""] }
+    }
+    const combined = await requestTranslation(
+        key,
+        blocks.join("\n" + CHUNK_SEPARATOR + "\n"),
+        BLOCK_PROMPT
+    )
+    if (combined.error) return { blocks: [], error: combined.error }
+    const parts = (combined.text || "").split(CHUNK_SEPARATOR)
+    if (
+        parts.length === blocks.length &&
+        parts.every(part => part.trim() !== "")
+    ) {
+        return { blocks: parts.map(part => part.trim()) }
+    }
+    // Rare: the model dropped or duplicated the separator. Translating each
+    // chunk on its own beats gluing two paragraphs onto the wrong one.
+    const results: string[] = []
+    for (const block of blocks) {
+        const single = await requestTranslation(key, block, BLOCK_PROMPT)
+        if (single.error) return { blocks: [], error: single.error }
+        results.push(single.text || "")
+    }
+    return { blocks: results }
+}
+
 export function setTranslateListeners() {
     ipcMain.handle(
         "translate-text",
@@ -222,6 +272,30 @@ export function setTranslateListeners() {
                 })
             }
             return translate(key, titleText, snippetText)
+        }
+    )
+
+    ipcMain.handle(
+        "translate-blocks",
+        async (_, blocks: unknown): Promise<TranslationBlocksResult> => {
+            const key = resolveKey()
+            if (!key) return { blocks: [], error: { code: "no-key" } }
+            const list = Array.isArray(blocks)
+                ? blocks.filter(
+                      (block): block is string =>
+                          typeof block === "string" && block.trim() !== ""
+                  )
+                : []
+            if (list.length === 0) {
+                return {
+                    blocks: [],
+                    error: {
+                        code: "bad-response",
+                        message: "Nothing to translate",
+                    },
+                }
+            }
+            return translateBlocks(key, list)
         }
     )
 

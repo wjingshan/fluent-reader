@@ -134,6 +134,13 @@ export interface TranslationResult {
     error?: TranslationError
 }
 
+// Article bodies travel as ordered chunks. `error` replaces `blocks` when the
+// request could not be made at all.
+export interface TranslationBlocksResult {
+    blocks: string[]
+    error?: TranslationError
+}
+
 export interface TranslationKeyState {
     // Key saved by the user. Empty when only the environment variable is set.
     key: string

@@ -1,7 +1,13 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import { renderToString } from "react-dom/server"
-import { useCallback, useEffect, useLayoutEffect, useState } from "react"
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from "react"
 import {
     markRead,
     markUnread,
@@ -34,6 +40,18 @@ import {
     closeContextMenu,
 } from "../scripts/models/app"
 import { useArticleView } from "./utils/hooks/useArticleView"
+import { useArticleTranslation } from "./utils/hooks/useArticleTranslation"
+import { translationMessage } from "../scripts/translate"
+import {
+    ArticleVariant,
+    clearArticleTranslationError,
+    failArticleTranslation,
+    getArticleTranslation,
+    readArticleHtml,
+    requestArticleTranslation,
+    toggleArticleTranslationView,
+    writeArticleHtml,
+} from "../scripts/article-translation"
 import { makeStyles, mergeClasses, shorthands } from "@griffel/react"
 
 const useStyles = makeStyles({
@@ -137,6 +155,15 @@ function Article({ itemId, side = false }: ArticleProps) {
         reload,
     } = useArticleView(item, source.openTarget)
 
+    // "content" is what the feed shipped, "full" is the fetched page Mercury
+    // renders; the two bodies are cached apart because they are different text.
+    const bodyVariant: ArticleVariant = loadFull ? "full" : "content"
+    const bodyRecord = useArticleTranslation(itemId, bodyVariant)
+    const bodyLoading = bodyRecord?.status === "loading"
+    const bodyFailed = bodyRecord?.status === "error"
+    const bodyTranslated =
+        bodyRecord?.status === "translated" && !bodyRecord.showOriginal
+
     const dismiss = () => dispatch(dismissItem())
     const handleNavigationKey = useCallback(
         (key: string) => {
@@ -205,6 +232,66 @@ function Article({ itemId, side = false }: ArticleProps) {
         handleToggleHidden,
         handleNavigationKey,
     ])
+
+    // The guest loads the original body by itself, so a freshly loaded page is
+    // always in the "original" state until something is injected into it.
+    const appliedBody = useRef<"original" | "translated">("original")
+    const injectToken = useRef(0)
+    useEffect(() => {
+        if (!loaded) appliedBody.current = "original"
+    }, [loaded])
+
+    // A cached translation is re-applied whenever the guest finishes loading,
+    // which is what makes the result survive closing and reopening the article.
+    useEffect(() => {
+        const node = webview.current
+        if (!node || !loaded || loadWebpage || !bodyRecord) return
+        const desired: "original" | "translated" =
+            bodyRecord.status === "translated" && !bodyRecord.showOriginal
+                ? "translated"
+                : "original"
+        if (desired === appliedBody.current) return
+        const html =
+            desired === "translated"
+                ? bodyRecord.translated
+                : bodyRecord.original
+        if (!html) return
+        const token = ++injectToken.current
+        writeArticleHtml(node, html).then(applied => {
+            if (applied && token === injectToken.current)
+                appliedBody.current = desired
+        })
+    }, [loaded, loadWebpage, bodyRecord, itemId])
+
+    useEffect(() => {
+        if (!bodyFailed) return
+        // Leave the button idle again so the next click simply retries; the
+        // reason stays in the button's title.
+        const timer = setTimeout(() => {
+            clearArticleTranslationError(itemId, bodyVariant)
+        }, 4000)
+        return () => clearTimeout(timer)
+    }, [bodyFailed, itemId, bodyVariant])
+
+    const handleBodyTranslation = useCallback(async () => {
+        if (loadWebpage) return
+        const variant: ArticleVariant = loadFull ? "full" : "content"
+        const record = getArticleTranslation(itemId, variant)
+        if (record?.status === "translated") {
+            // Cached: switching costs nothing, no request is made.
+            toggleArticleTranslationView(itemId, variant)
+            return
+        }
+        if (record?.status === "loading") return
+        const node = webview.current
+        if (!node) return
+        const html = await readArticleHtml(node)
+        if (!html) {
+            failArticleTranslation(itemId, variant, { code: "unavailable" })
+            return
+        }
+        await requestArticleTranslation(itemId, variant, html)
+    }, [itemId, loadFull, loadWebpage])
 
     const updateFontSize = (size: number) => {
         window.settings.setFontSize(size)
@@ -466,6 +553,33 @@ function Article({ itemId, side = false }: ArticleProps) {
                         iconProps={{ iconName: "Globe" }}
                         onClick={toggleWebpage}
                     />
+                    {loadWebpage ? null : (
+                        <CommandBarButton
+                            title={
+                                bodyFailed
+                                    ? translationMessage(bodyRecord)
+                                    : bodyLoading
+                                    ? intl.get("translate.bodyLoading")
+                                    : bodyTranslated
+                                    ? intl.get("translate.bodyOriginal")
+                                    : intl.get("translate.bodyTranslate")
+                            }
+                            text={
+                                bodyLoading
+                                    ? "…"
+                                    : bodyTranslated
+                                    ? intl.get("translate.glyphActive")
+                                    : intl.get("translate.glyphIdle")
+                            }
+                            className={bodyTranslated ? "active" : ""}
+                            iconProps={{
+                                iconName: bodyTranslated
+                                    ? "ViewOriginal"
+                                    : "Translate",
+                            }}
+                            onClick={handleBodyTranslation}
+                        />
+                    )}
                     <CommandBarButton
                         title={intl.get("more")}
                         iconProps={{ iconName: "More" }}

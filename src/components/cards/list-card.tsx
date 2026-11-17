@@ -6,7 +6,7 @@ import Highlights from "./highlights"
 import TranslateButton from "./translate-button"
 import { ViewConfigs } from "../../schema-types"
 import { SourceTextDirection } from "../../scripts/models/source"
-import { useTranslation } from "../utils/hooks/useTranslation"
+import { useCardTranslation } from "../utils/hooks/useCardTranslation"
 
 const useStyles = makeStyles({
     // Reserve the top right corner for the translate button, so the source
@@ -26,17 +26,10 @@ const className = (props: Card.Props) => {
 
 const ListCard: React.FunctionComponent<Card.Props> = props => {
     const classes = useStyles()
-    const record = useTranslation(props.item)
-    const translated = record?.status === "translated" && record.showTranslation
-    const title = translated
-        ? record.title || props.item.title
-        : props.item.title
-    const snippet = translated
-        ? record.snippet || props.item.snippet
-        : props.item.snippet
-    // The current search runs over the feed's own language, so highlight spans
-    // are skipped while the translation is shown.
-    const filter = translated ? { ...props.filter, search: "" } : props.filter
+    const { title, snippet, filter } = useCardTranslation(
+        props.item,
+        props.filter
+    )
 
     return (
         <div
