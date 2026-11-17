@@ -8,6 +8,13 @@ import { RSSItem } from "../../scripts/models/item"
 import { RSSSource } from "../../scripts/models/source"
 import { FeedFilter } from "../../scripts/models/feed"
 
+/** One thing a tile can show: a picture, or a clip (shown as its poster). */
+export type WaterfallMedia = {
+    kind: "image" | "video"
+    url: string
+    poster?: string | null
+}
+
 // The card is a picture with an overlay; the height follows the picture's own
 // aspect ratio, which is what makes the column layout a waterfall.
 const useStyles = makeStyles({
@@ -18,13 +25,18 @@ const useStyles = makeStyles({
         "backgroundColor": "var(--white)",
         "boxShadow": "#00000014 0 2px 8px",
         "cursor": "pointer",
-        "transition": "box-shadow 0.15s",
+        "transition": "box-shadow 0.15s, opacity 0.2s",
         ":hover": {
             boxShadow: "#00000029 0 6px 20px",
         },
     },
     itemRead: {
         opacity: 0.75,
+    },
+    // While one article is expanded, everything else recedes so the group of
+    // tiles that belong together stands out.
+    dimmed: {
+        opacity: 0.3,
     },
     thumb: {
         position: "relative",
@@ -37,6 +49,26 @@ const useStyles = makeStyles({
         width: "100%",
         height: "100%",
         objectFit: "cover",
+    },
+    // A clip tile shows its poster with this marker; hovering plays the clip
+    // through the media patch, which lays a video over the tile.
+    videoBadge: {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "34px",
+        height: "34px",
+        borderRadius: "50%",
+        backgroundColor: "#000000b3",
+        color: "#ffffff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "13px",
+        lineHeight: 1,
+        pointerEvents: "none",
+        zIndex: 15,
     },
     overlay: {
         "position": "absolute",
@@ -97,14 +129,14 @@ const useStyles = makeStyles({
         color: "#ffaa44",
         flexShrink: 0,
     },
-    // ---------- folded (multi-picture article, collapsed into a stack) --------
+    // ---------- folded (multi-item article, collapsed into a stack) ----------
     stack: {
         position: "relative",
         width: "100%",
         height: "100%",
     },
     // Sheets peeking out under the picture: this is what reads as "a stack".
-    // The tile reserves STACK_PEEK (10px) below the picture for them.
+    // The tile reserves a 10px band below the picture for them.
     sheet: {
         position: "absolute",
         left: "5px",
@@ -115,14 +147,14 @@ const useStyles = makeStyles({
         backgroundColor: "var(--neutralLight)",
         border: "1px solid var(--neutralQuaternaryAlt)",
     },
-    // The deeper sheet is narrower, so the stack reads as nested sheets rather
-    // than one wide card behind the picture.
+    // The deeper sheet is narrower, so the stack reads as nested sheets.
     sheetInner: {
         left: "10px",
         right: "10px",
         backgroundColor: "var(--neutralLighter)",
     },
-    // Left/right flip buttons, vertically centred on the picture.
+    // Controls sit above the hover-preview video (the media patch gives it
+    // z-index 4) and the Eagle button (7), or a clip tile would hide them.
     nav: {
         position: "absolute",
         top: "50%",
@@ -138,12 +170,7 @@ const useStyles = makeStyles({
         lineHeight: "22px",
         textAlign: "center",
         cursor: "pointer",
-        opacity: 0,
-        transition: "opacity 0.15s",
-        zIndex: 2,
-    },
-    navVisible: {
-        opacity: 1,
+        zIndex: 20,
     },
     navLeft: { left: "6px" },
     navRight: { right: "6px" },
@@ -161,7 +188,7 @@ const useStyles = makeStyles({
         "lineHeight": "18px",
         "fontFamily": "inherit",
         "cursor": "pointer",
-        "zIndex": 2,
+        "zIndex": 20,
         ":hover": { backgroundColor: "#000000cc" },
     },
     // Collapse control on the first tile of an expanded article.
@@ -178,10 +205,10 @@ const useStyles = makeStyles({
         "lineHeight": "18px",
         "fontFamily": "inherit",
         "cursor": "pointer",
-        "zIndex": 2,
+        "zIndex": 20,
         ":hover": { backgroundColor: "#000000cc" },
     },
-    // Later pictures of an expanded article: quiet position marker.
+    // Later items of an expanded article: quiet position marker.
     pageBadge: {
         position: "absolute",
         top: "6px",
@@ -193,6 +220,7 @@ const useStyles = makeStyles({
         fontSize: "11px",
         lineHeight: "16px",
         pointerEvents: "none",
+        zIndex: 20,
     },
     textCard: {
         padding: "12px",
@@ -223,17 +251,20 @@ const useStyles = makeStyles({
 })
 
 export type WaterfallCardProps = Card.Props & {
-    // Expanded: this tile shows one specific picture.
-    imageUrl?: string | null
+    // The item this tile shows.
+    media?: WaterfallMedia | null
+    // Expanded mode: this tile is one of several, at imageIndex.
     imageIndex?: number
     imageCount?: number
-    // Folded: the article is a stack; this tile shows one picture at a time.
+    // Folded mode: one tile showing one item at a time, with flipping.
     folded?: boolean
-    urls?: string[]
+    allMedia?: WaterfallMedia[]
     currentIndex?: number
     onFlip?: (delta: number) => void
     onExpand?: () => void
     onCollapse?: () => void
+    // Another article is expanded, so this tile steps back.
+    dimmed?: boolean
     onRatio: (ratio: number, key: string) => void
     ratioKey: string
     style?: React.CSSProperties
@@ -243,13 +274,19 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
     const styles = useStyles()
     const { item, source } = props
     const folded = Boolean(props.folded)
-    const urls = props.urls || []
     const currentIndex = props.currentIndex || 0
-    const imageUrl = folded
-        ? urls[currentIndex] || item.thumb
-        : props.imageUrl || item.thumb
-    const imageCount = folded ? urls.length : props.imageCount || 1
+    const allMedia = props.allMedia || []
+    const current: WaterfallMedia | null = folded
+        ? allMedia[currentIndex] || props.media || null
+        : props.media || null
+    const imageCount = folded ? allMedia.length : props.imageCount || 1
     const firstOfArticle = folded || (props.imageIndex || 0) === 0
+
+    // A clip tile has no picture of its own: fall back to the poster, then to
+    // the article thumbnail.
+    const isVideo = current?.kind === "video"
+    const displayUrl =
+        (isVideo ? current?.poster : current?.url) || current?.url || item.thumb
 
     // A folded stack keeps the height of its first picture: flipping must not
     // re-flow the whole column.
@@ -288,14 +325,15 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
         <div
             className={mergeClasses(
                 styles.item,
-                item.hasRead && styles.itemRead
+                item.hasRead && styles.itemRead,
+                props.dimmed && styles.dimmed
             )}
             {...Card.bindEventsToProps(props)}
             data-iid={item._id}
             data-fr-wf=""
             data-is-focusable
             style={props.style}>
-            {imageUrl ? (
+            {displayUrl ? (
                 folded ? (
                     <div className={styles.stack}>
                         {imageCount > 2 ? (
@@ -318,10 +356,13 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                             style={{ height: "calc(100% - 10px)" }}>
                             <img
                                 className={styles.image}
-                                src={imageUrl}
+                                src={displayUrl}
                                 loading="lazy"
                                 onLoad={handleLoad}
                             />
+                            {isVideo ? (
+                                <span className={styles.videoBadge}>▶</span>
+                            ) : null}
                             <div className={styles.overlay}>
                                 <h3 className={styles.title}>
                                     <Highlights
@@ -340,8 +381,7 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                                         aria-label="上一张"
                                         className={mergeClasses(
                                             styles.nav,
-                                            styles.navLeft,
-                                            styles.navVisible
+                                            styles.navLeft
                                         )}
                                         onClick={event => {
                                             stop(event)
@@ -359,8 +399,7 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                                         aria-label="下一张"
                                         className={mergeClasses(
                                             styles.nav,
-                                            styles.navRight,
-                                            styles.navVisible
+                                            styles.navRight
                                         )}
                                         onClick={event => {
                                             stop(event)
@@ -377,9 +416,9 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                             {imageCount > 1 ? (
                                 <button
                                     type="button"
-                                    title={"展开全部 " + imageCount + " 张"}
+                                    title={"展开全部 " + imageCount + " 项"}
                                     aria-label={
-                                        "展开全部 " + imageCount + " 张"
+                                        "展开全部 " + imageCount + " 项"
                                     }
                                     className={styles.expand}
                                     onClick={event => {
@@ -399,10 +438,13 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                     <div className={styles.thumb} style={{ height: "100%" }}>
                         <img
                             className={styles.image}
-                            src={imageUrl}
+                            src={displayUrl}
                             loading="lazy"
                             onLoad={handleLoad}
                         />
+                        {isVideo ? (
+                            <span className={styles.videoBadge}>▶</span>
+                        ) : null}
                         {firstOfArticle ? (
                             <div className={styles.overlay}>
                                 <h3 className={styles.title}>
@@ -433,7 +475,7 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
                                     if (event.button !== 2) stop(event)
                                 }}
                                 onDoubleClick={stop}>
-                                {imageCount} 张 ▾
+                                {imageCount} 项 ▾
                             </button>
                         ) : null}
                     </div>

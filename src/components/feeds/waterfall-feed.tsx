@@ -4,7 +4,7 @@ import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
 import { FocusZone } from "@fluentui/react"
 import { FeedProps } from "./feed"
-import WaterfallCard from "../cards/waterfall-card"
+import WaterfallCard, { WaterfallMedia } from "../cards/waterfall-card"
 import { RSSItem } from "../../scripts/models/item"
 import { useFeedTabStop } from "../utils/hooks/useFeedTabStop"
 import { FeedEnd } from "./feed-end"
@@ -50,15 +50,15 @@ type Placement = {
     height: number
 }
 
-/** One tile: either one picture of an expanded article, or a folded stack. */
+/** One tile: one media item, or a folded stack of them. */
 type Tile = {
     key: string
     item: RSSItem
-    url: string | null
+    media: WaterfallMedia | null
     index: number
     count: number
     folded: boolean
-    urls?: string[]
+    all?: WaterfallMedia[]
 }
 
 function absoluteUrl(src: string, base: string): string | null {
@@ -84,20 +84,62 @@ function baseFor(link: string): string {
     }
 }
 
-/** Every picture the article body carries, de-duplicated, in document order. */
-function imagesOf(item: RSSItem): string[] {
+const MEDIA_EXT = /\.(webm|mp4|m4v|mov)(\?|#|$)/i
+
+/** Name without an extension: webm and mp4 of one clip share a key. */
+function mediaKey(url: string): string {
+    const name = (url.split(/[?#]/)[0].split("/").pop() || url).toLowerCase()
+    return name.replace(/\.[a-z0-9]+$/i, "")
+}
+
+/**
+ * Every media item the article body carries, in document order.
+ * Videos count as items too: a clip-only post used to report a single picture,
+ * which hid the expand control even though the post clearly holds more.
+ */
+function mediaOf(item: RSSItem): WaterfallMedia[] {
     const content = item.content || ""
     const base = baseFor(item.link || "")
-    const urls: string[] = []
-    if (content.indexOf("<img") >= 0) {
+    const out: WaterfallMedia[] = []
+    // Separate sets on purpose: a post's still and its clip share a basename
+    // ("static/xxx.jpg" vs "webm/xxx.webm"), and collapsing those would hide the
+    // clip. Within one kind, webm and mp4 of the same clip still collapse.
+    const seenImage = new Set<string>()
+    const seenVideo = new Set<string>()
+    if (content.indexOf("<img") >= 0 || content.indexOf("<video") >= 0) {
         const doc = new DOMParser().parseFromString(content, "text/html")
         for (const img of Array.from(doc.querySelectorAll("img"))) {
             const resolved = absoluteUrl(img.getAttribute("src"), base)
-            if (resolved && urls.indexOf(resolved) < 0) urls.push(resolved)
+            if (!resolved) continue
+            const key = mediaKey(resolved)
+            if (seenImage.has(key)) continue
+            seenImage.add(key)
+            out.push({ kind: "image", url: resolved })
+        }
+        for (const node of Array.from(
+            doc.querySelectorAll("video, video > source")
+        )) {
+            const resolved = absoluteUrl(
+                node.getAttribute("src") || node.getAttribute("data-src"),
+                base
+            )
+            if (!resolved || !MEDIA_EXT.test(resolved)) continue
+            const key = mediaKey(resolved)
+            if (seenVideo.has(key)) continue
+            seenVideo.add(key)
+            out.push({
+                kind: "video",
+                url: resolved,
+                poster: absoluteUrl(
+                    (node.closest("video") || node).getAttribute("poster"),
+                    base
+                ),
+            })
         }
     }
-    if (urls.length === 0 && item.thumb) urls.push(item.thumb)
-    return urls.slice(0, MAX_TILES_PER_ITEM)
+    if (out.length === 0 && item.thumb)
+        out.push({ kind: "image", url: item.thumb })
+    return out.slice(0, MAX_TILES_PER_ITEM)
 }
 
 function buildTiles(
@@ -107,41 +149,41 @@ function buildTiles(
 ): Tile[] {
     const tiles: Tile[] = []
     for (const item of items) {
-        const urls = imagesOf(item)
-        if (urls.length === 0) {
+        const media = mediaOf(item)
+        if (media.length === 0) {
             tiles.push({
                 key: item._id + ":0",
                 item,
-                url: null,
+                media: null,
                 index: 0,
                 count: 1,
                 folded: false,
             })
             continue
         }
-        if (urls.length === 1 || expanded.has(item._id)) {
-            for (let index = 0; index < urls.length; index++) {
+        if (media.length === 1 || expanded.has(item._id)) {
+            for (let index = 0; index < media.length; index++) {
                 tiles.push({
                     key: item._id + ":" + index,
                     item,
-                    url: urls[index],
+                    media: media[index],
                     index,
-                    count: urls.length,
+                    count: media.length,
                     folded: false,
                 })
             }
             continue
         }
-        // Several pictures but not expanded: a single stack showing one at a time.
-        const current = Math.min(flipIndex.get(item._id) || 0, urls.length - 1)
+        // Several media items but not expanded: a single stack, one at a time.
+        const current = Math.min(flipIndex.get(item._id) || 0, media.length - 1)
         tiles.push({
             key: item._id + ":folded",
             item,
-            url: urls[current],
+            media: media[current],
             index: current,
-            count: urls.length,
+            count: media.length,
             folded: true,
-            urls,
+            all: media,
         })
     }
     return tiles
@@ -155,9 +197,9 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
     const [ratios, setRatios] = useState<Map<string, number>>(new Map())
     const pendingRatios = useRef<Map<string, number>>(new Map())
     const frame = useRef(0)
-    // Articles the user expanded into one tile per picture.
+    // Articles the user expanded into one tile per media item.
     const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
-    // Which picture a folded stack currently shows, per article.
+    // Which item a folded stack currently shows, per article.
     const [flipIndex, setFlipIndex] = useState<Map<number, number>>(
         () => new Map()
     )
@@ -238,10 +280,10 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
             for (let c = 1; c < columnCount; c++) {
                 if (heights[c] < heights[target]) target = c
             }
-            const ratio = tile.url
+            const ratio = tile.media
                 ? ratios.get(tile.key) || DEFAULT_RATIO
                 : null
-            const height = tile.url
+            const height = tile.media
                 ? columnWidth * ratio + (tile.folded ? STACK_PEEK : 0)
                 : TEXT_CARD_HEIGHT
             result.push({
@@ -280,17 +322,20 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
                     markRead={props.markRead}
                     contextMenu={props.contextMenu}
                     showItem={props.showItem}
-                    imageUrl={tile.url}
+                    media={tile.media}
                     imageIndex={tile.index}
                     imageCount={tile.count}
                     folded={tile.folded}
-                    urls={tile.urls}
+                    allMedia={tile.all}
                     currentIndex={tile.index}
                     onFlip={(delta: number) =>
                         flip(tile.item._id, delta, tile.count)
                     }
                     onExpand={() => expand(tile.item._id)}
                     onCollapse={() => collapse(tile.item._id)}
+                    // While an article is expanded, every tile that does not
+                    // belong to it recedes, so its own items stand out.
+                    dimmed={expanded.size > 0 && !expanded.has(tile.item._id)}
                     ratioKey={tile.key}
                     onRatio={(ratio: number, key: string) =>
                         handleRatio(key, ratio)
@@ -304,7 +349,16 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
                 />
             )
         },
-        [placements, ratios, props, handleRatio, flip, expand, collapse]
+        [
+            placements,
+            ratios,
+            props,
+            handleRatio,
+            flip,
+            expand,
+            collapse,
+            expanded,
+        ]
     )
 
     return (
