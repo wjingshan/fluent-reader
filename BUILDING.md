@@ -39,8 +39,11 @@ npm run package-win-ci
 ```
 
 - 用的是 `electron-builder -w --x64 -p never`，即 **NSIS 安装包 + 免安装 zip**
-- 产物在 `bin/win/x64/`：`Fluent Reader Setup <version>.exe` 与 `Fluent Reader <version>.exe`
+- 产物目录由 `electron-builder.yml` 的 `directories.output` 决定：**`bin/win32/x64/`**
+  （注意是 `win32`，不是 `win`），里面是 `Fluent Reader Setup <version>.exe` 和 `Fluent Reader <version>.exe`
 - `-p never` 表示不自动发布，只产出本地文件
+- 首次运行会先下载并解压约 **240 MB 的 Electron 运行时**到 `bin/win32/x64/win-unpacked/`，
+  这一步在慢网络下可能花很久；如果卡住，可以先设镜像再重试（见文末）
 
 **不要用 `npm run package-win`** —— 那个脚本打的是 **AppX**（`appx:x64` 与 `appx:arm64`），
 需要 `electron-builder.yml` 里 `appx.identityName` / `publisher` 对应的签名证书，本地一般跑不通。
