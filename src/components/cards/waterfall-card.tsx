@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useRef } from "react"
 import { makeStyles, mergeClasses } from "@griffel/react"
 import { Card } from "./card"
 import Highlights from "./highlights"
@@ -28,7 +29,6 @@ const useStyles = makeStyles({
     thumb: {
         position: "relative",
         width: "100%",
-        height: "100%",
         overflow: "hidden",
         backgroundColor: "var(--neutralLighter)",
     },
@@ -97,8 +97,91 @@ const useStyles = makeStyles({
         color: "#ffaa44",
         flexShrink: 0,
     },
-    // Later pictures of a multi-picture article: the title lives on the first
-    // tile only, so these carry a quiet position marker instead of repeating it.
+    // ---------- folded (multi-picture article, collapsed into a stack) --------
+    stack: {
+        position: "relative",
+        width: "100%",
+        height: "100%",
+    },
+    // Sheets peeking out under the picture: this is what reads as "a stack".
+    // The tile reserves STACK_PEEK (10px) below the picture for them.
+    sheet: {
+        position: "absolute",
+        left: "5px",
+        right: "5px",
+        top: 0,
+        height: "calc(100% - 10px)",
+        borderRadius: "4px",
+        backgroundColor: "var(--neutralLight)",
+        border: "1px solid var(--neutralQuaternaryAlt)",
+    },
+    // The deeper sheet is narrower, so the stack reads as nested sheets rather
+    // than one wide card behind the picture.
+    sheetInner: {
+        left: "10px",
+        right: "10px",
+        backgroundColor: "var(--neutralLighter)",
+    },
+    // Left/right flip buttons, vertically centred on the picture.
+    nav: {
+        position: "absolute",
+        top: "50%",
+        transform: "translateY(-50%)",
+        width: "22px",
+        height: "22px",
+        padding: 0,
+        border: "none",
+        borderRadius: "50%",
+        backgroundColor: "#0000008c",
+        color: "#ffffff",
+        fontSize: "14px",
+        lineHeight: "22px",
+        textAlign: "center",
+        cursor: "pointer",
+        opacity: 0,
+        transition: "opacity 0.15s",
+        zIndex: 2,
+    },
+    navVisible: {
+        opacity: 1,
+    },
+    navLeft: { left: "6px" },
+    navRight: { right: "6px" },
+    // "2/5 ⤢" pill: shows the position and expands the article into tiles.
+    expand: {
+        "position": "absolute",
+        "right": "6px",
+        "bottom": "6px",
+        "padding": "1px 7px",
+        "border": "none",
+        "borderRadius": "9px",
+        "backgroundColor": "#000000a6",
+        "color": "#ffffff",
+        "fontSize": "11px",
+        "lineHeight": "18px",
+        "fontFamily": "inherit",
+        "cursor": "pointer",
+        "zIndex": 2,
+        ":hover": { backgroundColor: "#000000cc" },
+    },
+    // Collapse control on the first tile of an expanded article.
+    collapse: {
+        "position": "absolute",
+        "left": "6px",
+        "bottom": "6px",
+        "padding": "1px 7px",
+        "border": "none",
+        "borderRadius": "9px",
+        "backgroundColor": "#000000a6",
+        "color": "#ffffff",
+        "fontSize": "11px",
+        "lineHeight": "18px",
+        "fontFamily": "inherit",
+        "cursor": "pointer",
+        "zIndex": 2,
+        ":hover": { backgroundColor: "#000000cc" },
+    },
+    // Later pictures of an expanded article: quiet position marker.
     pageBadge: {
         position: "absolute",
         top: "6px",
@@ -140,29 +223,48 @@ const useStyles = makeStyles({
 })
 
 export type WaterfallCardProps = Card.Props & {
-    // Which picture of the article this tile shows. Falls back to the stored
-    // thumbnail so single-picture articles keep working unchanged.
+    // Expanded: this tile shows one specific picture.
     imageUrl?: string | null
     imageIndex?: number
     imageCount?: number
-    onRatio: (ratio: number) => void
+    // Folded: the article is a stack; this tile shows one picture at a time.
+    folded?: boolean
+    urls?: string[]
+    currentIndex?: number
+    onFlip?: (delta: number) => void
+    onExpand?: () => void
+    onCollapse?: () => void
+    onRatio: (ratio: number, key: string) => void
+    ratioKey: string
     style?: React.CSSProperties
 }
 
 const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
     const styles = useStyles()
     const { item, source } = props
-    const imageUrl = props.imageUrl || item.thumb
-    const imageIndex = props.imageIndex || 0
-    const imageCount = props.imageCount || 1
-    const firstOfArticle = imageIndex === 0
+    const folded = Boolean(props.folded)
+    const urls = props.urls || []
+    const currentIndex = props.currentIndex || 0
+    const imageUrl = folded
+        ? urls[currentIndex] || item.thumb
+        : props.imageUrl || item.thumb
+    const imageCount = folded ? urls.length : props.imageCount || 1
+    const firstOfArticle = folded || (props.imageIndex || 0) === 0
 
-    // The tile height already follows the picture's own aspect ratio, so the
-    // picture just fills the tile; only the ratio itself has to be reported.
+    // A folded stack keeps the height of its first picture: flipping must not
+    // re-flow the whole column.
+    const reported = useRef(false)
     const handleLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
         const img = event.currentTarget
         if (!img.naturalWidth || !img.naturalHeight) return
-        props.onRatio(img.naturalHeight / img.naturalWidth)
+        if (folded && reported.current) return
+        reported.current = true
+        props.onRatio(img.naturalHeight / img.naturalWidth, props.ratioKey)
+    }
+
+    const stop = (event: React.MouseEvent) => {
+        event.preventDefault()
+        event.stopPropagation()
     }
 
     const unread = !item.hasRead
@@ -180,6 +282,8 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
         </>
     )
 
+    const canFlip = folded && imageCount > 1
+
     return (
         <div
             className={mergeClasses(
@@ -192,30 +296,148 @@ const WaterfallCard: React.FunctionComponent<WaterfallCardProps> = props => {
             data-is-focusable
             style={props.style}>
             {imageUrl ? (
-                <div className={styles.thumb}>
-                    <img
-                        className={styles.image}
-                        src={imageUrl}
-                        loading="lazy"
-                        onLoad={handleLoad}
-                    />
-                    {firstOfArticle ? (
-                        <div className={styles.overlay}>
-                            <h3 className={styles.title}>
-                                <Highlights
-                                    text={item.title}
-                                    filter={props.filter}
-                                    title
-                                />
-                            </h3>
-                            <div className={styles.sub}>{meta}</div>
+                folded ? (
+                    <div className={styles.stack}>
+                        {imageCount > 2 ? (
+                            <span
+                                className={mergeClasses(
+                                    styles.sheet,
+                                    styles.sheetInner
+                                )}
+                                style={{ top: "8px" }}
+                            />
+                        ) : null}
+                        {imageCount > 1 ? (
+                            <span
+                                className={styles.sheet}
+                                style={{ top: "4px" }}
+                            />
+                        ) : null}
+                        <div
+                            className={styles.thumb}
+                            style={{ height: "calc(100% - 10px)" }}>
+                            <img
+                                className={styles.image}
+                                src={imageUrl}
+                                loading="lazy"
+                                onLoad={handleLoad}
+                            />
+                            <div className={styles.overlay}>
+                                <h3 className={styles.title}>
+                                    <Highlights
+                                        text={item.title}
+                                        filter={props.filter}
+                                        title
+                                    />
+                                </h3>
+                                <div className={styles.sub}>{meta}</div>
+                            </div>
+                            {canFlip ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        title="上一张"
+                                        aria-label="上一张"
+                                        className={mergeClasses(
+                                            styles.nav,
+                                            styles.navLeft,
+                                            styles.navVisible
+                                        )}
+                                        onClick={event => {
+                                            stop(event)
+                                            props.onFlip?.(-1)
+                                        }}
+                                        onMouseUp={event => {
+                                            if (event.button !== 2) stop(event)
+                                        }}
+                                        onDoubleClick={stop}>
+                                        ‹
+                                    </button>
+                                    <button
+                                        type="button"
+                                        title="下一张"
+                                        aria-label="下一张"
+                                        className={mergeClasses(
+                                            styles.nav,
+                                            styles.navRight,
+                                            styles.navVisible
+                                        )}
+                                        onClick={event => {
+                                            stop(event)
+                                            props.onFlip?.(1)
+                                        }}
+                                        onMouseUp={event => {
+                                            if (event.button !== 2) stop(event)
+                                        }}
+                                        onDoubleClick={stop}>
+                                        ›
+                                    </button>
+                                </>
+                            ) : null}
+                            {imageCount > 1 ? (
+                                <button
+                                    type="button"
+                                    title={"展开全部 " + imageCount + " 张"}
+                                    aria-label={
+                                        "展开全部 " + imageCount + " 张"
+                                    }
+                                    className={styles.expand}
+                                    onClick={event => {
+                                        stop(event)
+                                        props.onExpand?.()
+                                    }}
+                                    onMouseUp={event => {
+                                        if (event.button !== 2) stop(event)
+                                    }}
+                                    onDoubleClick={stop}>
+                                    {currentIndex + 1}/{imageCount} ⤢
+                                </button>
+                            ) : null}
                         </div>
-                    ) : (
-                        <span className={styles.pageBadge}>
-                            {imageIndex + 1}/{imageCount}
-                        </span>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div className={styles.thumb} style={{ height: "100%" }}>
+                        <img
+                            className={styles.image}
+                            src={imageUrl}
+                            loading="lazy"
+                            onLoad={handleLoad}
+                        />
+                        {firstOfArticle ? (
+                            <div className={styles.overlay}>
+                                <h3 className={styles.title}>
+                                    <Highlights
+                                        text={item.title}
+                                        filter={props.filter}
+                                        title
+                                    />
+                                </h3>
+                                <div className={styles.sub}>{meta}</div>
+                            </div>
+                        ) : (
+                            <span className={styles.pageBadge}>
+                                {(props.imageIndex || 0) + 1}/{imageCount}
+                            </span>
+                        )}
+                        {firstOfArticle && imageCount > 1 ? (
+                            <button
+                                type="button"
+                                title="收起"
+                                aria-label="收起"
+                                className={styles.collapse}
+                                onClick={event => {
+                                    stop(event)
+                                    props.onCollapse?.()
+                                }}
+                                onMouseUp={event => {
+                                    if (event.button !== 2) stop(event)
+                                }}
+                                onDoubleClick={stop}>
+                                {imageCount} 张 ▾
+                            </button>
+                        ) : null}
+                    </div>
+                )
             ) : (
                 <div className={styles.textCard}>
                     <h3 className={styles.textTitle}>

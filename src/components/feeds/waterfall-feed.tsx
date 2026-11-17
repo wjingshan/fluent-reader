@@ -10,9 +10,11 @@ import { useFeedTabStop } from "../utils/hooks/useFeedTabStop"
 import { FeedEnd } from "./feed-end"
 
 const GAP = 12
-// An article with several pictures shows them as separate tiles; this caps the
-// blow-up so one 50-picture gallery cannot bury the rest of the feed.
+// An article with several pictures is folded into one stack by default; after
+// expanding, this caps how many tiles it may occupy.
 const MAX_TILES_PER_ITEM = 12
+// Room under the picture for the stacked sheets to peek out.
+const STACK_PEEK = 10
 const MIN_COLUMN_WIDTH = 200
 // Height / width used until the picture reports its own size.
 const DEFAULT_RATIO = 0.75
@@ -48,13 +50,15 @@ type Placement = {
     height: number
 }
 
-/** One picture of one article: what a tile actually shows. */
+/** One tile: either one picture of an expanded article, or a folded stack. */
 type Tile = {
     key: string
     item: RSSItem
     url: string | null
     index: number
     count: number
+    folded: boolean
+    urls?: string[]
 }
 
 function absoluteUrl(src: string, base: string): string | null {
@@ -96,7 +100,11 @@ function imagesOf(item: RSSItem): string[] {
     return urls.slice(0, MAX_TILES_PER_ITEM)
 }
 
-function expandToTiles(items: RSSItem[]): Tile[] {
+function buildTiles(
+    items: RSSItem[],
+    expanded: Set<number>,
+    flipIndex: Map<number, number>
+): Tile[] {
     const tiles: Tile[] = []
     for (const item of items) {
         const urls = imagesOf(item)
@@ -107,18 +115,34 @@ function expandToTiles(items: RSSItem[]): Tile[] {
                 url: null,
                 index: 0,
                 count: 1,
+                folded: false,
             })
             continue
         }
-        for (let index = 0; index < urls.length; index++) {
-            tiles.push({
-                key: item._id + ":" + index,
-                item,
-                url: urls[index],
-                index,
-                count: urls.length,
-            })
+        if (urls.length === 1 || expanded.has(item._id)) {
+            for (let index = 0; index < urls.length; index++) {
+                tiles.push({
+                    key: item._id + ":" + index,
+                    item,
+                    url: urls[index],
+                    index,
+                    count: urls.length,
+                    folded: false,
+                })
+            }
+            continue
         }
+        // Several pictures but not expanded: a single stack showing one at a time.
+        const current = Math.min(flipIndex.get(item._id) || 0, urls.length - 1)
+        tiles.push({
+            key: item._id + ":folded",
+            item,
+            url: urls[current],
+            index: current,
+            count: urls.length,
+            folded: true,
+            urls,
+        })
     }
     return tiles
 }
@@ -131,6 +155,12 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
     const [ratios, setRatios] = useState<Map<string, number>>(new Map())
     const pendingRatios = useRef<Map<string, number>>(new Map())
     const frame = useRef(0)
+    // Articles the user expanded into one tile per picture.
+    const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
+    // Which picture a folded stack currently shows, per article.
+    const [flipIndex, setFlipIndex] = useState<Map<number, number>>(
+        () => new Map()
+    )
 
     useEffect(() => {
         const main = document.querySelector(".main")
@@ -143,7 +173,10 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
     }, [])
 
     // Parsing every article's HTML is only worth doing when the items change.
-    const tiles = useMemo(() => expandToTiles(props.items), [props.items])
+    const tiles = useMemo(
+        () => buildTiles(props.items, expanded, flipIndex),
+        [props.items, expanded, flipIndex]
+    )
 
     // Collect picture sizes without re-laying out for every single image.
     const handleRatio = useCallback((key: string, ratio: number) => {
@@ -158,6 +191,32 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
                 updates.forEach((value, k) => next.set(k, value))
                 return next
             })
+        })
+    }, [])
+
+    const flip = useCallback((iid: number, delta: number, count: number) => {
+        if (count <= 1) return
+        setFlipIndex(prev => {
+            const next = new Map(prev)
+            const current = next.get(iid) || 0
+            next.set(iid, (current + delta + count) % count)
+            return next
+        })
+    }, [])
+
+    const expand = useCallback((iid: number) => {
+        setExpanded(prev => {
+            const next = new Set(prev)
+            next.add(iid)
+            return next
+        })
+    }, [])
+
+    const collapse = useCallback((iid: number) => {
+        setExpanded(prev => {
+            const next = new Set(prev)
+            next.delete(iid)
+            return next
         })
     }, [])
 
@@ -182,7 +241,9 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
             const ratio = tile.url
                 ? ratios.get(tile.key) || DEFAULT_RATIO
                 : null
-            const height = tile.url ? columnWidth * ratio : TEXT_CARD_HEIGHT
+            const height = tile.url
+                ? columnWidth * ratio + (tile.folded ? STACK_PEEK : 0)
+                : TEXT_CARD_HEIGHT
             result.push({
                 key: index,
                 left: target * (columnWidth + GAP),
@@ -222,7 +283,18 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
                     imageUrl={tile.url}
                     imageIndex={tile.index}
                     imageCount={tile.count}
-                    onRatio={(ratio: number) => handleRatio(tile.key, ratio)}
+                    folded={tile.folded}
+                    urls={tile.urls}
+                    currentIndex={tile.index}
+                    onFlip={(delta: number) =>
+                        flip(tile.item._id, delta, tile.count)
+                    }
+                    onExpand={() => expand(tile.item._id)}
+                    onCollapse={() => collapse(tile.item._id)}
+                    ratioKey={tile.key}
+                    onRatio={(ratio: number, key: string) =>
+                        handleRatio(key, ratio)
+                    }
                     style={{
                         left: `${placement.left}px`,
                         top: `${placement.top}px`,
@@ -232,7 +304,7 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
                 />
             )
         },
-        [placements, ratios, props, handleRatio]
+        [placements, ratios, props, handleRatio, flip, expand, collapse]
     )
 
     return (
