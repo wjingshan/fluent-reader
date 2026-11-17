@@ -114,6 +114,32 @@ export function getRuleTargetKey(target: RuleTarget): RuleTargetKey {
     }
 }
 
+export type TranslationErrorCode =
+    | "no-key"
+    | "api-error"
+    | "bad-response"
+    | "unavailable"
+
+export interface TranslationError {
+    code: TranslationErrorCode
+    message?: string
+}
+
+// Translation arrives as two strings; `error` replaces both when the request
+// could not be made at all. Deliberately not a discriminated union: the project
+// compiles without strictNullChecks, where `ok: true | false` does not narrow.
+export interface TranslationResult {
+    title: string
+    snippet: string
+    error?: TranslationError
+}
+
+export interface TranslationKeyState {
+    // Key saved by the user. Empty when only the environment variable is set.
+    key: string
+    fromEnvironment: boolean
+}
+
 export type SchemaTypes = {
     version: string
     theme: ThemeSettings
@@ -141,4 +167,7 @@ export type SchemaTypes = {
     dbVersion: string
     // 0 = off, 1 = merge copies of the same canonical link (see duplicate.ts).
     duplicateFilter: number
+    // DeepSeek key for on-demand article translation. Falls back to
+    // DEEPSEEK_API_KEY when empty (see main/translate.ts).
+    translateApiKey: string
 }

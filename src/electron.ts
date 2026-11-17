@@ -4,6 +4,7 @@ import { store } from "./main/settings"
 import performUpdate from "./main/update-scripts"
 import { WindowManager } from "./main/window"
 import { initDB } from "./main/db"
+import { setTranslateListeners } from "./main/translate"
 
 if (!process.mas) {
     const locked = app.requestSingleInstanceLock()
@@ -105,6 +106,8 @@ if (process.platform === "darwin") {
 }
 
 const winManager = new WindowManager()
+
+setTranslateListeners()
 
 initDB(store, winManager, () => {
     restarting = true

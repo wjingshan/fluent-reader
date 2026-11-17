@@ -72,6 +72,9 @@ function AppTab({
         window.settings.getProxyStatus()
     )
     const [pacUrl, setPacUrl] = useState(() => window.settings.getProxy())
+    const [apiKey, setApiKey] = useState("")
+    const [keyVisible, setKeyVisible] = useState(false)
+    const [keyFromEnv, setKeyFromEnv] = useState(false)
     const [itemSize, setItemSize] = useState<string>(null)
     const [cacheSize, setCacheSize] = useState<string>(null)
     const [deleteIndex, setDeleteIndex] = useState<string>(null)
@@ -84,10 +87,21 @@ function AppTab({
         window.utils.getCacheSize().then(size => {
             if (active) setCacheSize(byteToMB(size))
         })
+        if (window.translation) {
+            window.translation.getApiKey().then(state => {
+                if (!active) return
+                setApiKey(state.key)
+                setKeyFromEnv(state.fromEnvironment)
+            })
+        }
         return () => {
             active = false
         }
     }, [])
+
+    function saveApiKey() {
+        if (window.translation) window.translation.setApiKey(apiKey.trim())
+    }
 
     const languageOptions = [
         { value: "default", text: intl.get("followSystem") },
@@ -134,6 +148,12 @@ function AppTab({
     }))
     const validPacUrl = urlTest(pacUrl)
     const pacError = pacUrl && !validPacUrl ? intl.get("app.badUrl") : ""
+    const apiKeyHint =
+        keyFromEnv && !apiKey.trim()
+            ? `${intl.get("translate.apiKeyHint")} ${intl.get(
+                  "translate.apiKeyFromEnv"
+              )}`
+            : intl.get("translate.apiKeyHint")
 
     function toggleProxy() {
         window.settings.toggleProxyStatus()
@@ -261,6 +281,30 @@ function AppTab({
                         </Option>
                     ))}
                 </Dropdown>
+            </Field>
+
+            <Field label={intl.get("translate.apiKey")} hint={apiKeyHint}>
+                <div className={classes.row}>
+                    <Input
+                        className={classes.grow}
+                        type={keyVisible ? "text" : "password"}
+                        value={apiKey}
+                        placeholder={intl.get("translate.apiKeyPlaceholder")}
+                        aria-label={intl.get("translate.apiKey")}
+                        autoComplete="off"
+                        spellCheck={false}
+                        onChange={(_, data) => setApiKey(data.value)}
+                        onBlur={saveApiKey}
+                        onKeyDown={event => {
+                            if (event.key === "Enter") saveApiKey()
+                        }}
+                    />
+                    <Button onClick={() => setKeyVisible(visible => !visible)}>
+                        {keyVisible
+                            ? intl.get("translate.hideKey")
+                            : intl.get("translate.showKey")}
+                    </Button>
+                </div>
             </Field>
 
             <Field

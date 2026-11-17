@@ -223,6 +223,22 @@
         "fetchUnlimited": "無限制（不建議）",
         "exportToLite": "匯出至 Fluent Reader Lite"
     },
+    "translate": {
+        "action": "翻譯為中文",
+        "showOriginal": "顯示原文",
+        "glyphIdle": "譯",
+        "glyphActive": "原",
+        "loading": "正在翻譯…",
+        "noKey": "尚未設定翻譯 API Key，請於「選項 → 應用偏好」中填寫。",
+        "unavailable": "目前視窗無法使用翻譯。",
+        "failed": "翻譯失敗：{error}",
+        "apiKey": "DeepSeek API Key",
+        "apiKeyHint": "用於在列表檢視中按需翻譯標題與摘要。留空時讀取環境變數 DEEPSEEK_API_KEY。",
+        "apiKeyFromEnv": "目前使用環境變數 DEEPSEEK_API_KEY。",
+        "apiKeyPlaceholder": "sk-…",
+        "showKey": "顯示",
+        "hideKey": "隱藏"
+    },
     "app": {
         "cleanup": "清理",
         "cache": "清空快取",

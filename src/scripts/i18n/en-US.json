@@ -225,6 +225,22 @@
         "fetchUnlimited": "Unlimited (not recommended)",
         "exportToLite": "Export to Fluent Reader Lite"
     },
+    "translate": {
+        "action": "Translate into Chinese",
+        "showOriginal": "Show the original text",
+        "glyphIdle": "ZH",
+        "glyphActive": "EN",
+        "loading": "Translating…",
+        "noKey": "Translation API Key isn't configured. Add it in Settings → Preferences.",
+        "unavailable": "Translation isn't available in this window.",
+        "failed": "Translation failed: {error}",
+        "apiKey": "DeepSeek API Key",
+        "apiKeyHint": "Used to translate article titles and snippets on demand in list view. Leave empty to use the DEEPSEEK_API_KEY environment variable.",
+        "apiKeyFromEnv": "Currently using the DEEPSEEK_API_KEY environment variable.",
+        "apiKeyPlaceholder": "sk-…",
+        "showKey": "Show",
+        "hideKey": "Hide"
+    },
     "app": {
         "cleanup": "Clean up",
         "cache": "Clear cache",
