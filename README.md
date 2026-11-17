@@ -1,3 +1,9 @@
+> **这是 [wjingshan](https://github.com/wjingshan) 的本地修改版分支（`master-Rae`）。**
+> 在上游 1.3.2 之上加了瀑布流多图折叠/展开/翻页、按需翻译、窗口置顶、分组拖拽排序等本地功能，
+> 并附带一层运行时补丁（Referer 注入、悬停播放视频、Eagle 导入）。
+> 从源码构建与打包见 [BUILDING.md](BUILDING.md)，补丁说明见 [local-patch/README.md](local-patch/README.md)。
+> 本分支不再向上游提交 PR。
+
 <p align="center">
   <img width="120" height="120" src="https://github.com/yang991178/fluent-reader/raw/master/build/icon.png">
 </p>
