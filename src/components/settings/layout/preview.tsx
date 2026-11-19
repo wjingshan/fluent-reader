@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
 import { LayoutConfig, ViewType } from "../../../schema-types"
@@ -43,10 +44,11 @@ const useStyles = makeStyles({
         overflow: "hidden",
         borderBottom: "1px solid var(--neutralQuaternaryAlt)",
     },
-    // A flat grey block reads as an empty placeholder, which made the preview
-    // look broken. A soft gradient plus a picture glyph stands in for a cover
-    // without needing a network image.
+    // Fallback for a cover with no picture: a soft gradient plus a glyph reads
+    // as an image placeholder instead of a flat grey box. Real thumbnails are
+    // drawn on top of it by `coverImg`.
     cover: {
+        position: "relative",
         backgroundColor: "var(--neutralLight)",
         backgroundImage:
             "linear-gradient(135deg, var(--neutralQuaternaryAlt) 0%, var(--neutralLight) 55%, var(--neutralLighter) 100%)",
@@ -56,6 +58,25 @@ const useStyles = makeStyles({
         color: "var(--neutralTertiary)",
         flexShrink: 0,
         overflow: "hidden",
+    },
+    coverImg: {
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+    },
+    scrim: {
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        backgroundImage:
+            "linear-gradient(180deg, #00000000 40%, #000000b3 100%)",
     },
     title: {
         "fontWeight": 600,
@@ -79,7 +100,7 @@ type Stage = {
     content: React.ReactNode
 }
 
-/** Picture glyph so a cover reads as an image instead of an empty box. */
+/** Picture glyph so an empty cover reads as an image slot, not an error. */
 function CoverGlyph({ size }: { size: number }) {
     return (
         <svg
@@ -96,9 +117,44 @@ function CoverGlyph({ size }: { size: number }) {
     )
 }
 
+/**
+ * A real thumbnail from the user's own feeds, falling back to the gradient and
+ * glyph when there is none (fresh install, empty database) or the picture fails
+ * to load, so the preview never shows a broken-image box.
+ */
+function Cover({
+    src,
+    size,
+    position,
+}: {
+    src?: string
+    size: number
+    position?: string
+}) {
+    const classes = useStyles()
+    const [failed, setFailed] = useState(false)
+    // A new picture deserves a new attempt; the failure is per-src, not global.
+    useEffect(() => setFailed(false), [src])
+    if (src && !failed) {
+        return (
+            <img
+                className={classes.coverImg}
+                src={src}
+                alt=""
+                draggable={false}
+                style={position ? { objectPosition: position } : undefined}
+                onError={() => setFailed(true)}
+            />
+        )
+    }
+    return <CoverGlyph size={size} />
+}
+
 export type LayoutPreviewProps = {
     view: ViewType
     config: LayoutConfig
+    /** Cover picture taken from the newest article that has one. */
+    thumb?: string
 }
 
 const previewText = () => ({
@@ -107,7 +163,7 @@ const previewText = () => ({
     meta: intl.get("layout.sampleMeta"),
 })
 
-function cardsStage(config: LayoutConfig, classes: any): Stage {
+function cardsStage(config: LayoutConfig, classes: any, thumb: string): Stage {
     const gap = config.cardGap
     const rowGap = Math.round(gap * 1.5)
     const cellWidth = config.cardsColumnWidth
@@ -143,7 +199,7 @@ function cardsStage(config: LayoutConfig, classes: any): Stage {
                 <div
                     className={classes.cover}
                     style={{ height: `${coverHeight}px` }}>
-                    <CoverGlyph size={Math.max(16, coverHeight * 0.3)} />
+                    <Cover src={thumb} size={Math.max(16, coverHeight * 0.3)} />
                 </div>
                 <div style={{ padding: "6px 10px", overflow: "hidden" }}>
                     <div
@@ -178,7 +234,7 @@ function cardsStage(config: LayoutConfig, classes: any): Stage {
     }
 }
 
-function listStage(config: LayoutConfig, classes: any): Stage {
+function listStage(config: LayoutConfig, classes: any, thumb: string): Stage {
     const cover = config.listCoverHeight
     const text = previewText()
     return {
@@ -199,7 +255,7 @@ function listStage(config: LayoutConfig, classes: any): Stage {
                         height: `${cover}px`,
                         margin: "8px 0 8px 10px",
                     }}>
-                    <CoverGlyph size={Math.max(14, cover * 0.28)} />
+                    <Cover src={thumb} size={Math.max(14, cover * 0.28)} />
                 </div>
                 <div
                     style={{
@@ -238,7 +294,11 @@ function listStage(config: LayoutConfig, classes: any): Stage {
     }
 }
 
-function magazineStage(config: LayoutConfig, classes: any): Stage {
+function magazineStage(
+    config: LayoutConfig,
+    classes: any,
+    thumb: string
+): Stage {
     const cover = config.magazineCoverHeight
     // The row is as tall as the taller of the cover and the text block.
     const textHeight =
@@ -247,17 +307,24 @@ function magazineStage(config: LayoutConfig, classes: any): Stage {
         2 * (config.cardSnippetSize + 7) +
         16
     const height = Math.max(cover, textHeight)
+    // Drawn at its real configured width; the stage is scaled down to fit, so
+    // the cover-to-text ratio stays truthful.
+    const width = config.magazineWidth
     const text = previewText()
     return {
-        width: STAGE_WIDTH,
+        width,
         height,
         content: (
             <div
                 className={classes.rowCard}
                 style={{
-                    width: `${STAGE_WIDTH}px`,
+                    width: `${width}px`,
                     height: `${height}px`,
                     padding: "24px",
+                    // "Follow the theme" reads as the white page the real view
+                    // sits on; a chosen colour shows as-is.
+                    backgroundColor:
+                        config.magazineBackground || "var(--white)",
                     fontFamily: cardFontStack(config.cardFont),
                 }}>
                 <div
@@ -267,7 +334,7 @@ function magazineStage(config: LayoutConfig, classes: any): Stage {
                         height: `${cover}px`,
                         marginRight: "25px",
                     }}>
-                    <CoverGlyph size={Math.max(14, cover * 0.3)} />
+                    <Cover src={thumb} size={Math.max(14, cover * 0.3)} />
                 </div>
                 <div
                     style={{
@@ -375,18 +442,31 @@ function compactStage(config: LayoutConfig, classes: any): Stage {
     }
 }
 
-function waterfallStage(config: LayoutConfig, classes: any): Stage {
+function waterfallStage(
+    config: LayoutConfig,
+    classes: any,
+    thumb: string
+): Stage {
     const gap = config.waterfallGap
     const minWidth = config.waterfallMinColumnWidth
-    const columns = Math.max(
+    // Same rule as the feed: fit as many minimum-width columns as possible, then
+    // honour the cap (0 = no cap).
+    const natural = Math.max(
         1,
-        Math.min(3, Math.floor((STAGE_WIDTH + gap) / (minWidth + gap)))
+        Math.floor((STAGE_WIDTH + gap) / (minWidth + gap))
+    )
+    const columns = Math.min(
+        natural,
+        config.waterfallMaxColumns > 0 ? config.waterfallMaxColumns : natural
     )
     const columnWidth = (columns * minWidth + gap * (columns - 1)) / columns
     const heights = [minWidth * 1.1, minWidth * 0.72, minWidth * 1.35].slice(
         0,
         columns
     )
+    // Crop the single available picture to a different part per column, so three
+    // side-by-side tiles do not read as one image duplicated.
+    const offsets = ["20% 50%", "50% 50%", "80% 50%"]
     const text = previewText()
     const blocks = heights.map((height, index) => (
         <div
@@ -398,17 +478,23 @@ function waterfallStage(config: LayoutConfig, classes: any): Stage {
                 marginRight: index === columns - 1 ? 0 : `${gap}px`,
                 flexShrink: 0,
                 flexGrow: 1,
-                flexDirection: "column",
-                gap: "4px",
-                padding: "6px",
                 fontFamily: cardFontStack(config.cardFont),
             }}>
-            <CoverGlyph size={Math.max(16, Math.round(columnWidth * 0.16))} />
+            <Cover
+                src={thumb}
+                size={Math.max(16, Math.round(columnWidth * 0.16))}
+                position={offsets[index % offsets.length]}
+            />
+            {thumb ? <div className={classes.scrim} /> : null}
             <span
                 style={{
-                    fontSize: `${Math.max(9, config.cardTitleSize - 5)}px`,
+                    position: "absolute",
+                    left: "6px",
+                    right: "6px",
+                    bottom: "6px",
+                    fontSize: `${Math.max(9, config.cardTitleSize - 3)}px`,
                     fontWeight: 600,
-                    color: "var(--neutralDark)",
+                    color: thumb ? "var(--white)" : "var(--neutralDark)",
                     textAlign: "center",
                     lineHeight: 1.25,
                     display: "-webkit-box",
@@ -431,24 +517,28 @@ function waterfallStage(config: LayoutConfig, classes: any): Stage {
     }
 }
 
-export function LayoutPreview({ view, config }: LayoutPreviewProps) {
+export function LayoutPreview({
+    view,
+    config,
+    thumb = "",
+}: LayoutPreviewProps) {
     const classes = useStyles()
     let stage: Stage
     switch (view) {
         case ViewType.List:
-            stage = listStage(config, classes)
+            stage = listStage(config, classes, thumb)
             break
         case ViewType.Magazine:
-            stage = magazineStage(config, classes)
+            stage = magazineStage(config, classes, thumb)
             break
         case ViewType.Compact:
             stage = compactStage(config, classes)
             break
         case ViewType.Customized:
-            stage = waterfallStage(config, classes)
+            stage = waterfallStage(config, classes, thumb)
             break
         default:
-            stage = cardsStage(config, classes)
+            stage = cardsStage(config, classes, thumb)
             break
     }
     const scale = Math.min(

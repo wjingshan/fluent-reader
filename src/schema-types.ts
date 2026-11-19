@@ -51,13 +51,23 @@ export interface LayoutConfig {
     listCoverHeight: number
     listTitleSize: number
     magazineCoverHeight: number
+    magazineWidth: number
+    // Empty means "follow the theme": the card stays transparent and only turns
+    // white on hover, exactly as the static sheet does. Otherwise #rrggbb.
+    magazineBackground: string
     compactRowHeight: number
     waterfallMinColumnWidth: number
     waterfallGap: number
     waterfallMaxTiles: number
+    // Upper bound on columns; 0 means "no cap", which is the historical
+    // behaviour of deriving the count purely from the container width.
+    waterfallMaxColumns: number
 }
 
-export type LayoutNumberKey = Exclude<keyof LayoutConfig, "cardFont">
+export type LayoutNumberKey = Exclude<
+    keyof LayoutConfig,
+    "cardFont" | "magazineBackground"
+>
 
 export const LAYOUT_RANGES: Record<
     LayoutNumberKey,
@@ -71,10 +81,12 @@ export const LAYOUT_RANGES: Record<
     listCoverHeight: { min: 48, max: 140, step: 4 },
     listTitleSize: { min: 12, max: 22, step: 1 },
     magazineCoverHeight: { min: 100, max: 280, step: 10 },
+    magazineWidth: { min: 400, max: 1200, step: 25 },
     compactRowHeight: { min: 24, max: 56, step: 2 },
     waterfallMinColumnWidth: { min: 140, max: 320, step: 10 },
     waterfallGap: { min: 4, max: 32, step: 2 },
     waterfallMaxTiles: { min: 2, max: 24, step: 1 },
+    waterfallMaxColumns: { min: 0, max: 8, step: 1 },
 }
 
 export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
@@ -87,10 +99,13 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
     listCoverHeight: 80,
     listTitleSize: 14,
     magazineCoverHeight: 160,
+    magazineWidth: 700,
+    magazineBackground: "",
     compactRowHeight: 31,
     waterfallMinColumnWidth: 200,
     waterfallGap: 12,
     waterfallMaxTiles: 12,
+    waterfallMaxColumns: 0,
 }
 
 export const LAYOUT_NUMBER_KEYS = Object.keys(
@@ -108,6 +123,19 @@ export function sanitizeFontFamily(font: unknown): string {
         .slice(0, 64)
 }
 
+// The colour travels into a CSS custom property as well. Only "#rrggbb" (or the
+// short "#rgb" form, expanded) is accepted; anything else means "follow the
+// theme", so a half-typed or hand-edited value can never inject CSS or leave the
+// card with an invisible background.
+export function sanitizeHexColor(value: unknown): string {
+    if (typeof value !== "string") return ""
+    const trimmed = value.trim().toLowerCase()
+    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(trimmed)
+    if (short)
+        return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`
+    return /^#[0-9a-f]{6}$/.test(trimmed) ? trimmed : ""
+}
+
 export function normalizeLayoutConfig(
     config: Partial<LayoutConfig> = null
 ): LayoutConfig {
@@ -121,6 +149,7 @@ export function normalizeLayoutConfig(
         result[key] = Math.min(max, Math.max(min, snapped))
     }
     result.cardFont = sanitizeFontFamily(config.cardFont)
+    result.magazineBackground = sanitizeHexColor(config.magazineBackground)
     return result
 }
 
@@ -130,7 +159,9 @@ export function countCustomLayout(config: LayoutConfig): number {
     for (const key of LAYOUT_NUMBER_KEYS) {
         if (normalized[key] !== DEFAULT_LAYOUT_CONFIG[key]) count += 1
     }
-    if (normalized.cardFont !== DEFAULT_LAYOUT_CONFIG.cardFont) count += 1
+    for (const key of ["cardFont", "magazineBackground"] as const) {
+        if (normalized[key] !== DEFAULT_LAYOUT_CONFIG[key]) count += 1
+    }
     return count
 }
 

@@ -1,5 +1,6 @@
 import intl from "react-intl-universal"
-import { LayoutConfig } from "../schema-types"
+import { LayoutConfig, sanitizeHexColor } from "../schema-types"
+import { RSSItem } from "./models/item"
 
 // Every adjustable card metric is published as a custom property on :root, so
 // card styles (Griffel) only reference a variable and no component has to
@@ -23,6 +24,13 @@ export function applyLayoutVariables(config: LayoutConfig) {
         "--fr-magazine-cover-height",
         px(config.magazineCoverHeight)
     )
+    style.setProperty("--fr-magazine-width", px(config.magazineWidth))
+    // "Follow the theme" keeps the historical pair: transparent at rest, white
+    // on hover. A chosen colour is used for both, and the hover shadow alone
+    // provides the feedback, so the card never flashes the wrong colour.
+    const magazineBg = sanitizeHexColor(config.magazineBackground)
+    style.setProperty("--fr-magazine-bg", magazineBg || "transparent")
+    style.setProperty("--fr-magazine-bg-hover", magazineBg || "var(--white)")
     style.setProperty("--fr-compact-row-height", px(config.compactRowHeight))
     // A compact row is one line of title plus one of snippet; the padding and
     // borders around them take the remaining 13px of the 31px row.
@@ -40,6 +48,24 @@ export function applyLayoutVariables(config: LayoutConfig) {
 // "inherit" keeps the app font the theme already sets on the root element.
 export function cardFontStack(font: string): string {
     return font ? `"${font}", sans-serif` : "inherit"
+}
+
+// One real cover for the settings preview. Item ids grow with time, so walking
+// them backwards yields the newest article that has a loadable thumbnail: the
+// item parser drops anything that is not http(s), which covers both plain URLs
+// and the loopback image proxy some feeds rewrite theirs to.
+export function findPreviewThumb(
+    items: Record<number, RSSItem> | undefined
+): string {
+    if (!items) return ""
+    const ids = Object.keys(items)
+        .map(Number)
+        .sort((a, b) => b - a)
+    for (const id of ids) {
+        const thumb = items[id]?.thumb
+        if (thumb) return thumb
+    }
+    return ""
 }
 
 type FontChoice = {

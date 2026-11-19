@@ -14,7 +14,20 @@ const useStyles = makeStyles({
     // follows whichever of cover and text is taller, unchanged at the defaults.
     metrics: {
         "maxHeight": "none",
+        "width": "var(--fr-magazine-width, 700px)",
         "fontFamily": "var(--fr-card-font-family, inherit)",
+        // The static sheet only sets a background on :hover, so the rest state
+        // has to come from here. Both are variables: following the theme yields
+        // transparent / white, a chosen colour yields the same colour twice.
+        "backgroundColor": "var(--fr-magazine-bg, transparent)",
+        ":hover": {
+            backgroundColor: "var(--fr-magazine-bg-hover, var(--white))",
+        },
+        // The static sheet clears the background while pressed; keeping the
+        // variable here means a chosen colour does not blink away on click.
+        ":active": {
+            backgroundColor: "var(--fr-magazine-bg, transparent)",
+        },
         "& div.head": {
             width: "calc(var(--fr-magazine-cover-height, 160px) * 1.25)",
             height: "var(--fr-magazine-cover-height, 160px)",

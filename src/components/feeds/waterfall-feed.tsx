@@ -204,6 +204,7 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
     const gap = layout.waterfallGap
     const minColumnWidth = layout.waterfallMinColumnWidth
     const maxTiles = layout.waterfallMaxTiles
+    const maxColumns = layout.waterfallMaxColumns
     const [width, setWidth] = useState(0)
     // Measured height/width per tile; pictures report theirs when they load.
     const [ratios, setRatios] = useState<Map<string, number>>(new Map())
@@ -274,9 +275,13 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
         })
     }, [])
 
-    const columnCount = Math.max(
-        1,
-        Math.floor((width + gap) / (minColumnWidth + gap))
+    // Derived from the container as it always was, then optionally capped: 0
+    // means "no cap", so the default reproduces the old behaviour exactly. A
+    // cap only makes the columns wider than the minimum, it never leaves the
+    // row short of space.
+    const columnCount = Math.min(
+        Math.max(1, Math.floor((width + gap) / (minColumnWidth + gap))),
+        maxColumns > 0 ? maxColumns : Infinity
     )
     const columnWidth =
         columnCount > 0
