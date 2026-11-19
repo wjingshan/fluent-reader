@@ -16,7 +16,8 @@ const useStyles = makeStyles({
     // overflow hidden, and the box keeps a 31px floor.
     layout: {
         "height": "auto",
-        "minHeight": "var(--fr-compact-row-height, 31px)",
+        "minHeight":
+            "var(--fr-compact-min-height, var(--fr-compact-row-height, 31px))",
         "boxSizing": "border-box",
         "padding": "4px 34px 4px 9px",
         "alignItems": "center",
@@ -42,12 +43,17 @@ const useStyles = makeStyles({
             lineHeight: "var(--fr-compact-line-height, 18px)",
         },
         "& .data .snippet": {
-            display: "block",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            fontSize: "calc(var(--fr-card-snippet-size, 14px) - 2px)",
-            lineHeight: "calc(var(--fr-compact-line-height, 18px) - 2px)",
+            // At one line the row keeps the original block / nowrap / ellipsis
+            // snippet; past that it becomes a clamped wrapping box whose height
+            // is paid for by --fr-compact-min-height above.
+            "display": "var(--fr-compact-snippet-display, block)",
+            "-webkit-box-orient": "vertical",
+            "-webkit-line-clamp": "var(--fr-compact-snippet-lines, 1)",
+            "overflow": "hidden",
+            "textOverflow": "ellipsis",
+            "whiteSpace": "var(--fr-compact-snippet-wrap, nowrap)",
+            "fontSize": "calc(var(--fr-card-snippet-size, 14px) - 2px)",
+            "lineHeight": "calc(var(--fr-compact-line-height, 18px) - 2px)",
         },
         "& .info": {
             lineHeight: "var(--fr-compact-line-height, 18px)",

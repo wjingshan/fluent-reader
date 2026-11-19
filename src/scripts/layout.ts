@@ -13,7 +13,13 @@ export function applyLayoutVariables(config: LayoutConfig) {
     // gutter (12 / 18 in the original cards.css).
     style.setProperty("--fr-card-gap", px(config.cardGap))
     style.setProperty("--fr-card-row-gap", px(config.cardGap * 1.5))
-    style.setProperty("--fr-cards-column-width", px(config.cardsColumnWidth))
+    // The setting is the card's own width; the feed cuts the page into cells, and
+    // a cell is the card plus its two gutters. Everything downstream (card size,
+    // filler width, rows per page) keeps working on the cell.
+    style.setProperty(
+        "--fr-cards-column-width",
+        px(config.cardsColumnWidth + config.cardGap * 2)
+    )
     style.setProperty("--fr-cards-row-height", px(config.cardsRowHeight))
     style.setProperty("--fr-card-title-size", px(config.cardTitleSize))
     style.setProperty("--fr-card-snippet-size", px(config.cardSnippetSize))
@@ -21,10 +27,14 @@ export function applyLayoutVariables(config: LayoutConfig) {
     style.setProperty("--fr-list-cover-height", px(config.listCoverHeight))
     style.setProperty("--fr-list-title-size", px(config.listTitleSize))
     style.setProperty(
+        "--fr-list-snippet-lines",
+        String(config.listSnippetLines)
+    )
+    style.setProperty(
         "--fr-magazine-cover-height",
         px(config.magazineCoverHeight)
     )
-    style.setProperty("--fr-magazine-width", px(config.magazineWidth))
+    style.setProperty("--fr-magazine-inset", px(config.magazineInset))
     // "Follow the theme" keeps the historical pair: transparent at rest, white
     // on hover. A chosen colour is used for both, and the hover shadow alone
     // provides the feedback, so the card never flashes the wrong colour.
@@ -32,11 +42,31 @@ export function applyLayoutVariables(config: LayoutConfig) {
     style.setProperty("--fr-magazine-bg", magazineBg || "transparent")
     style.setProperty("--fr-magazine-bg-hover", magazineBg || "var(--white)")
     style.setProperty("--fr-compact-row-height", px(config.compactRowHeight))
-    // A compact row is one line of title plus one of snippet; the padding and
+    // A compact row is one line of title plus its snippet lines; the padding and
     // borders around them take the remaining 13px of the 31px row.
+    const compactLine = Math.max(12, config.compactRowHeight - 13)
+    style.setProperty("--fr-compact-line-height", px(compactLine))
+    const snippetLines = config.compactSnippetLines
+    style.setProperty("--fr-compact-snippet-lines", String(snippetLines))
+    // One line keeps the original nowrap / block / ellipsis row untouched; more
+    // lines need a wrapping, clamped box instead.
     style.setProperty(
-        "--fr-compact-line-height",
-        px(config.compactRowHeight - 13)
+        "--fr-compact-snippet-wrap",
+        snippetLines > 1 ? "normal" : "nowrap"
+    )
+    style.setProperty(
+        "--fr-compact-snippet-display",
+        snippetLines > 1 ? "-webkit-box" : "block"
+    )
+    // The row grows with the extra lines so nothing is clipped; at one line this
+    // is the configured row height again, i.e. exactly the old floor.
+    style.setProperty(
+        "--fr-compact-min-height",
+        px(
+            snippetLines > 1
+                ? 8 + compactLine + snippetLines * (compactLine - 2)
+                : config.compactRowHeight
+        )
     )
     style.setProperty(
         "--fr-waterfall-min-column",

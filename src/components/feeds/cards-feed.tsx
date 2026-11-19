@@ -20,9 +20,9 @@ const CardsFeed: React.FC<FeedProps> = props => {
     const classes = useStyles()
     const { elementRef, onPagesUpdated } = useFeedTabStop()
     const layout = useAppSelector(s => s.app.layout)
-    // The page is cut into cells of this size; the card itself is the cell
-    // minus its gutters (see default-card.tsx).
-    const cellWidth = layout.cardsColumnWidth
+    // The setting is the card's own width; the page is cut into cells that also
+    // hold the two gutters around the card (see default-card.tsx).
+    const cellWidth = layout.cardsColumnWidth + layout.cardGap * 2
     const cellHeight = layout.cardsRowHeight
     const [width, setWidth] = useState(window.innerWidth)
     const [height, setHeight] = useState(window.innerHeight)

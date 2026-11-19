@@ -46,16 +46,25 @@ export interface LayoutConfig {
     // Empty means "follow the app font". A value is one family name, unquoted.
     cardFont: string
     cardGap: number
+    // The card's own width. The grid cell is this plus the card's two gutters,
+    // because the feed cuts the page into cells and the card is what is left
+    // inside one (see cards-feed.tsx), so a single number drives both.
     cardsColumnWidth: number
     cardsRowHeight: number
     listCoverHeight: number
     listTitleSize: number
+    // Snippet lines shown before the text is clamped.
+    listSnippetLines: number
     magazineCoverHeight: number
-    magazineWidth: number
+    // Blank kept on each side of the centred magazine card, on top of the gap the
+    // window already leaves. 0 keeps the historical 700px card.
+    magazineInset: number
     // Empty means "follow the theme": the card stays transparent and only turns
     // white on hover, exactly as the static sheet does. Otherwise #rrggbb.
     magazineBackground: string
     compactRowHeight: number
+    // Snippet lines in a compact row. 1 keeps the original single-line row.
+    compactSnippetLines: number
     // Target width of one waterfall tile. The column count follows from this and
     // the container width, so a wider value gives fewer, larger pictures.
     waterfallMinColumnWidth: number
@@ -79,9 +88,11 @@ export const LAYOUT_RANGES: Record<
     cardsRowHeight: { min: 260, max: 420, step: 10 },
     listCoverHeight: { min: 48, max: 140, step: 4 },
     listTitleSize: { min: 12, max: 22, step: 1 },
+    listSnippetLines: { min: 1, max: 5, step: 1 },
     magazineCoverHeight: { min: 100, max: 280, step: 10 },
-    magazineWidth: { min: 400, max: 1200, step: 25 },
+    magazineInset: { min: 0, max: 200, step: 4 },
     compactRowHeight: { min: 24, max: 56, step: 2 },
+    compactSnippetLines: { min: 1, max: 3, step: 1 },
     waterfallMinColumnWidth: { min: 140, max: 320, step: 10 },
     waterfallGap: { min: 4, max: 32, step: 2 },
     waterfallMaxTiles: { min: 2, max: 24, step: 1 },
@@ -92,14 +103,17 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
     cardSnippetSize: 14,
     cardFont: "",
     cardGap: 12,
-    cardsColumnWidth: 280,
+    // 256 + 2 × 12 gutters = the historical 280px grid cell.
+    cardsColumnWidth: 256,
     cardsRowHeight: 304,
     listCoverHeight: 80,
     listTitleSize: 14,
+    listSnippetLines: 2,
     magazineCoverHeight: 160,
-    magazineWidth: 700,
+    magazineInset: 0,
     magazineBackground: "",
     compactRowHeight: 31,
+    compactSnippetLines: 1,
     waterfallMinColumnWidth: 200,
     waterfallGap: 12,
     waterfallMaxTiles: 12,
@@ -138,12 +152,27 @@ export function normalizeLayoutConfig(
 ): LayoutConfig {
     const result: LayoutConfig = { ...DEFAULT_LAYOUT_CONFIG }
     if (!config || typeof config !== "object") return result
+    // A config written before the card width became the setting stored the grid
+    // cell (card plus its two gutters) under the same key. magazineWidth was
+    // removed in the same change, so its presence identifies such a config; the
+    // value is converted once so an existing layout looks the same after the
+    // upgrade. Migrated configs no longer carry that key, and are not touched
+    // again.
+    const legacy = (config as { magazineWidth?: number }).magazineWidth
     for (const key of LAYOUT_NUMBER_KEYS) {
         const raw = Number(config[key])
         if (!Number.isFinite(raw)) continue
         const { min, max, step } = LAYOUT_RANGES[key]
         const snapped = Math.round(raw / step) * step
         result[key] = Math.min(max, Math.max(min, snapped))
+    }
+    if (typeof legacy === "number" && Number.isFinite(legacy)) {
+        const { min, max, step } = LAYOUT_RANGES.cardsColumnWidth
+        const card = result.cardsColumnWidth - result.cardGap * 2
+        result.cardsColumnWidth = Math.min(
+            max,
+            Math.max(min, Math.round(card / step) * step)
+        )
     }
     result.cardFont = sanitizeFontFamily(config.cardFont)
     result.magazineBackground = sanitizeHexColor(config.magazineBackground)

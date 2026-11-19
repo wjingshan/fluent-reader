@@ -29,8 +29,11 @@ const useStyles = makeStyles({
             lineHeight: "calc(var(--fr-list-title-size, 14px) + 4px)",
         },
         "& p.snippet": {
-            fontSize: "calc(var(--fr-card-snippet-size, 14px) - 2px)",
-            lineHeight: "calc(var(--fr-card-snippet-size, 14px) + 2px)",
+            "fontSize": "calc(var(--fr-card-snippet-size, 14px) - 2px)",
+            "lineHeight": "calc(var(--fr-card-snippet-size, 14px) + 2px)",
+            // The static sheet clamps the snippet to 2 lines; the setting moves
+            // that clamp instead of the row height, and the row grows with it.
+            "-webkit-line-clamp": "var(--fr-list-snippet-lines, 2)",
         },
     },
 })

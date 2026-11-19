@@ -169,7 +169,11 @@ const GROUPS: LayoutGroupDef[] = [
         titleKey: "layout.groupCards",
         view: ViewType.Cards,
         items: [
-            { key: "cardsColumnWidth", labelKey: "layout.cardsColumnWidth" },
+            {
+                key: "cardsColumnWidth",
+                labelKey: "layout.cardsCardWidth",
+                hintKey: "layout.cardsCardWidthHint",
+            },
             { key: "cardsRowHeight", labelKey: "layout.cardsRowHeight" },
         ],
         keys: ["cardsColumnWidth", "cardsRowHeight"],
@@ -181,8 +185,14 @@ const GROUPS: LayoutGroupDef[] = [
         items: [
             { key: "listCoverHeight", labelKey: "layout.listCoverHeight" },
             { key: "listTitleSize", labelKey: "layout.listTitleSize" },
+            {
+                key: "listSnippetLines",
+                labelKey: "layout.listSnippetLines",
+                unitKey: "layout.unitLines",
+                hintKey: "layout.listSnippetLinesHint",
+            },
         ],
-        keys: ["listCoverHeight", "listTitleSize"],
+        keys: ["listCoverHeight", "listTitleSize", "listSnippetLines"],
     },
     {
         key: "magazine",
@@ -194,9 +204,13 @@ const GROUPS: LayoutGroupDef[] = [
                 key: "magazineCoverHeight",
                 labelKey: "layout.magazineCoverHeight",
             },
-            { key: "magazineWidth", labelKey: "layout.magazineWidth" },
+            {
+                key: "magazineInset",
+                labelKey: "layout.magazineInset",
+                hintKey: "layout.magazineInsetHint",
+            },
         ],
-        keys: ["magazineCoverHeight", "magazineWidth", "magazineBackground"],
+        keys: ["magazineCoverHeight", "magazineInset", "magazineBackground"],
     },
     {
         key: "compact",
@@ -204,8 +218,14 @@ const GROUPS: LayoutGroupDef[] = [
         view: ViewType.Compact,
         items: [
             { key: "compactRowHeight", labelKey: "layout.compactRowHeight" },
+            {
+                key: "compactSnippetLines",
+                labelKey: "layout.compactSnippetLines",
+                unitKey: "layout.unitLines",
+                hintKey: "layout.compactSnippetLinesHint",
+            },
         ],
-        keys: ["compactRowHeight"],
+        keys: ["compactRowHeight", "compactSnippetLines"],
     },
     {
         key: "waterfall",

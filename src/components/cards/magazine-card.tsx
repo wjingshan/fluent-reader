@@ -14,7 +14,12 @@ const useStyles = makeStyles({
     // follows whichever of cover and text is taller, unchanged at the defaults.
     metrics: {
         "maxHeight": "none",
-        "width": "var(--fr-magazine-width, 700px)",
+        // The window decides the width: the card fills it minus the inset on
+        // each side, and it never grows past the historical 700px card (which
+        // also shrinks by the same inset, so the control keeps working on wide
+        // windows instead of being swallowed by the cap).
+        "width": "calc(100% - 2 * var(--fr-magazine-inset, 0px))",
+        "maxWidth": "calc(700px - 2 * var(--fr-magazine-inset, 0px))",
         "fontFamily": "var(--fr-card-font-family, inherit)",
         // The static sheet only sets a background on :hover, so the rest state
         // has to come from here. Both are variables: following the theme yields
