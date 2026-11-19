@@ -315,7 +315,7 @@
         "waterfallMinColumnWidth": "Minimum column width",
         "waterfallGap": "Column gap",
         "waterfallMaxColumns": "Maximum columns",
-        "waterfallMaxColumnsHint": "0 means no limit: the count follows the container width and the minimum column width alone.",
+        "waterfallMaxColumnsHint": "Upper bound on the number of columns. Defaults to 5 and can be set from 2 to 12; the actual count still depends on the container width and the minimum column width.",
         "waterfallMaxTiles": "Max tiles per article",
         "waterfallMaxTilesHint": "When an article carries more pictures than this, folding and expanding only use the first ones.",
         "unitTiles": "tiles",

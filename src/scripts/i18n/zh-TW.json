@@ -313,7 +313,7 @@
         "waterfallMinColumnWidth": "最小欄寬",
         "waterfallGap": "欄間距",
         "waterfallMaxColumns": "最大欄數",
-        "waterfallMaxColumnsHint": "設為 0 表示不限制，欄數只由容器寬度與最小欄寬決定。",
+        "waterfallMaxColumnsHint": "直欄數量上限。預設 5 欄，可調 2–12 欄；實際欄數仍受容器寬度與最小欄寬影響。",
         "waterfallMaxTiles": "單篇最多展開",
         "waterfallMaxTilesHint": "一篇文章的圖片超過此數量時，摺疊與展開只取前若干張。",
         "unitTiles": "張",

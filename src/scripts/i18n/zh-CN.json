@@ -313,7 +313,7 @@
         "waterfallMinColumnWidth": "最小列宽",
         "waterfallGap": "列间距",
         "waterfallMaxColumns": "最大列数",
-        "waterfallMaxColumnsHint": "设为 0 表示不限制，列数只由容器宽度与最小列宽决定。",
+        "waterfallMaxColumnsHint": "竖栏数量上限。默认 5 栏，可调 2–12 栏；实际栏数仍受容器宽度与最小列宽影响。",
         "waterfallMaxTiles": "单篇最多展开",
         "waterfallMaxTilesHint": "一篇文章的图片超过此数量时，折叠与展开只取前若干张。",
         "unitTiles": "张",

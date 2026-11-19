@@ -59,8 +59,9 @@ export interface LayoutConfig {
     waterfallMinColumnWidth: number
     waterfallGap: number
     waterfallMaxTiles: number
-    // Upper bound on columns; 0 means "no cap", which is the historical
-    // behaviour of deriving the count purely from the container width.
+    // Upper bound on the number of columns. The count is derived from the
+    // container width and the minimum column width, then capped here, so a wide
+    // window does not end up with dozens of very narrow columns.
     waterfallMaxColumns: number
 }
 
@@ -86,7 +87,7 @@ export const LAYOUT_RANGES: Record<
     waterfallMinColumnWidth: { min: 140, max: 320, step: 10 },
     waterfallGap: { min: 4, max: 32, step: 2 },
     waterfallMaxTiles: { min: 2, max: 24, step: 1 },
-    waterfallMaxColumns: { min: 0, max: 8, step: 1 },
+    waterfallMaxColumns: { min: 2, max: 12, step: 1 },
 }
 
 export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
@@ -105,7 +106,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
     waterfallMinColumnWidth: 200,
     waterfallGap: 12,
     waterfallMaxTiles: 12,
-    waterfallMaxColumns: 0,
+    waterfallMaxColumns: 5,
 }
 
 export const LAYOUT_NUMBER_KEYS = Object.keys(
@@ -144,6 +145,13 @@ export function normalizeLayoutConfig(
     for (const key of LAYOUT_NUMBER_KEYS) {
         const raw = Number(config[key])
         if (!Number.isFinite(raw)) continue
+        // Older builds stored 0 for "no cap". That value is out of range now,
+        // and clamping it to the new minimum would silently shrink every
+        // existing waterfall to two columns, so it maps to the new default.
+        if (key === "waterfallMaxColumns" && raw === 0) {
+            result[key] = DEFAULT_LAYOUT_CONFIG.waterfallMaxColumns
+            continue
+        }
         const { min, max, step } = LAYOUT_RANGES[key]
         const snapped = Math.round(raw / step) * step
         result[key] = Math.min(max, Math.max(min, snapped))

@@ -275,13 +275,13 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
         })
     }, [])
 
-    // Derived from the container as it always was, then optionally capped: 0
-    // means "no cap", so the default reproduces the old behaviour exactly. A
-    // cap only makes the columns wider than the minimum, it never leaves the
+    // Derived from the container as it always was, then capped. The slider's
+    // floor is 2, so a wide window cannot end up with dozens of narrow columns;
+    // the cap only ever makes columns wider than the minimum, never leaves the
     // row short of space.
     const columnCount = Math.min(
         Math.max(1, Math.floor((width + gap) / (minColumnWidth + gap))),
-        maxColumns > 0 ? maxColumns : Infinity
+        Math.max(2, maxColumns)
     )
     const columnWidth =
         columnCount > 0
