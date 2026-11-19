@@ -449,69 +449,92 @@ function waterfallStage(
 ): Stage {
     const gap = config.waterfallGap
     const minWidth = config.waterfallMinColumnWidth
-    // Same rule as the feed: fit as many minimum-width columns as possible, then
-    // honour the cap (0 = no cap).
-    const natural = Math.max(
+    // Same rule as the feed: fit as many target-width columns as possible, then
+    // let them share the whole stage so the preview fills its width instead of
+    // leaving a strip of empty space on the right.
+    const columns = Math.max(
         1,
         Math.floor((STAGE_WIDTH + gap) / (minWidth + gap))
     )
-    const columns = Math.min(
-        natural,
-        config.waterfallMaxColumns > 0 ? config.waterfallMaxColumns : natural
-    )
-    const columnWidth = (columns * minWidth + gap * (columns - 1)) / columns
-    const heights = [minWidth * 1.1, minWidth * 0.72, minWidth * 1.35].slice(
-        0,
-        columns
-    )
-    // Crop the single available picture to a different part per column, so three
-    // side-by-side tiles do not read as one image duplicated.
-    const offsets = ["20% 50%", "50% 50%", "80% 50%"]
+    const columnWidth = (STAGE_WIDTH - gap * (columns - 1)) / columns
+    // Two stacked tiles per column, staggered so the grid reads as a waterfall
+    // rather than a plain table.
+    const topHeight = Math.round((STAGE_HEIGHT - gap) * 0.62)
+    const bottomHeight = STAGE_HEIGHT - gap - topHeight
+    // Crop the single available picture differently per tile, so the columns do
+    // not look like one image duplicated.
+    const offsets = [
+        "20% 50%",
+        "50% 50%",
+        "80% 50%",
+        "35% 30%",
+        "65% 70%",
+        "50% 20%",
+    ]
     const text = previewText()
-    const blocks = heights.map((height, index) => (
+    const tile = (height: number, index: number) => (
         <div
             key={index}
             className={mergeClasses(classes.card, classes.cover)}
             style={{
                 width: `${columnWidth}px`,
                 height: `${height}px`,
-                marginRight: index === columns - 1 ? 0 : `${gap}px`,
                 flexShrink: 0,
-                flexGrow: 1,
                 fontFamily: cardFontStack(config.cardFont),
             }}>
             <Cover
                 src={thumb}
-                size={Math.max(16, Math.round(columnWidth * 0.16))}
+                size={Math.max(14, Math.round(columnWidth * 0.16))}
                 position={offsets[index % offsets.length]}
             />
             {thumb ? <div className={classes.scrim} /> : null}
-            <span
-                style={{
-                    position: "absolute",
-                    left: "6px",
-                    right: "6px",
-                    bottom: "6px",
-                    fontSize: `${Math.max(9, config.cardTitleSize - 3)}px`,
-                    fontWeight: 600,
-                    color: thumb ? "var(--white)" : "var(--neutralDark)",
-                    textAlign: "center",
-                    lineHeight: 1.25,
-                    display: "-webkit-box",
-                    WebkitLineClamp: "2",
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                }}>
-                {text.title}
-            </span>
+            {height > 60 ? (
+                <span
+                    style={{
+                        position: "absolute",
+                        left: "6px",
+                        right: "6px",
+                        bottom: "5px",
+                        fontSize: `${Math.max(9, config.cardTitleSize - 4)}px`,
+                        fontWeight: 600,
+                        color: thumb ? "var(--white)" : "var(--neutralDark)",
+                        textAlign: "center",
+                        lineHeight: 1.25,
+                        display: "-webkit-box",
+                        WebkitLineClamp: "2",
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                    }}>
+                    {text.title}
+                </span>
+            ) : null}
         </div>
-    ))
+    )
     return {
-        width: columns * columnWidth + gap * (columns - 1),
-        height: Math.max(...heights),
+        width: STAGE_WIDTH,
+        height: STAGE_HEIGHT,
         content: (
-            <div style={{ display: "flex", alignItems: "flex-start" }}>
-                {blocks}
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: `${gap}px`,
+                    width: `${STAGE_WIDTH}px`,
+                    height: `${STAGE_HEIGHT}px`,
+                }}>
+                {Array.from({ length: columns }, (_, column) => (
+                    <div
+                        key={column}
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: `${gap}px`,
+                            width: `${columnWidth}px`,
+                        }}>
+                        {tile(topHeight, column * 2)}
+                        {tile(bottomHeight, column * 2 + 1)}
+                    </div>
+                ))}
             </div>
         ),
     }

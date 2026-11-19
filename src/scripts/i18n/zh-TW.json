@@ -310,10 +310,7 @@
         "magazineBackgroundInvalid": "請輸入 #rrggbb 或 #rgb",
         "magazineBackgroundHint": "留空即跟隨主題：卡片透明，僅在滑鼠移入時變為白色。",
         "compactRowHeight": "卡片高度",
-        "waterfallMinColumnWidth": "最小欄寬",
         "waterfallGap": "欄間距",
-        "waterfallMaxColumns": "最大欄數",
-        "waterfallMaxColumnsHint": "直欄數量上限。預設 5 欄，可調 2–12 欄；實際欄數仍受容器寬度與最小欄寬影響。",
         "waterfallMaxTiles": "單篇最多展開",
         "waterfallMaxTilesHint": "一篇文章的圖片超過此數量時，摺疊與展開只取前若干張。",
         "unitTiles": "張",
@@ -332,6 +329,8 @@
         "fontMonospace": "等寬",
         "sampleTitle": "範例標題，用來判斷字級與字型是否合適",
         "sampleSnippet": "範例摘要文字，展示摘要目前在字級下的行高與密度。",
-        "sampleMeta": "範例訂閱源 · 12 分鐘前"
+        "sampleMeta": "範例訂閱源 · 12 分鐘前",
+        "waterfallTileWidth": "圖片寬度",
+        "waterfallTileWidthHint": "每張圖片的目標寬度。越寬則一屏欄數越少、圖片越大；實際寬度會按視窗寬度均分，略大於此值。"
     }
 }

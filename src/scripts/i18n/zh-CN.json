@@ -310,10 +310,7 @@
         "magazineBackgroundInvalid": "请输入 #rrggbb 或 #rgb",
         "magazineBackgroundHint": "留空即跟随主题：卡片透明，仅在悬停时变为白色。",
         "compactRowHeight": "卡片高度",
-        "waterfallMinColumnWidth": "最小列宽",
         "waterfallGap": "列间距",
-        "waterfallMaxColumns": "最大列数",
-        "waterfallMaxColumnsHint": "竖栏数量上限。默认 5 栏，可调 2–12 栏；实际栏数仍受容器宽度与最小列宽影响。",
         "waterfallMaxTiles": "单篇最多展开",
         "waterfallMaxTilesHint": "一篇文章的图片超过此数量时，折叠与展开只取前若干张。",
         "unitTiles": "张",
@@ -332,6 +329,8 @@
         "fontMonospace": "等宽",
         "sampleTitle": "示例标题，用来判断字号与字体是否合适",
         "sampleSnippet": "示例摘要文字，展示摘要在当前字号下的行高与密度。",
-        "sampleMeta": "示例订阅源 · 12 分钟前"
+        "sampleMeta": "示例订阅源 · 12 分钟前",
+        "waterfallTileWidth": "图片宽度",
+        "waterfallTileWidthHint": "每张图片的目标宽度。越宽则一屏列数越少、图片越大；实际宽度会按窗口宽度均分，略大于此值。"
     }
 }

@@ -312,10 +312,7 @@
         "magazineBackgroundInvalid": "Enter #rrggbb or #rgb",
         "magazineBackgroundHint": "Leave empty to follow the theme: the card stays transparent and turns white on hover.",
         "compactRowHeight": "Row height",
-        "waterfallMinColumnWidth": "Minimum column width",
         "waterfallGap": "Column gap",
-        "waterfallMaxColumns": "Maximum columns",
-        "waterfallMaxColumnsHint": "Upper bound on the number of columns. Defaults to 5 and can be set from 2 to 12; the actual count still depends on the container width and the minimum column width.",
         "waterfallMaxTiles": "Max tiles per article",
         "waterfallMaxTilesHint": "When an article carries more pictures than this, folding and expanding only use the first ones.",
         "unitTiles": "tiles",
@@ -334,6 +331,8 @@
         "fontMonospace": "Monospace",
         "sampleTitle": "Sample headline to judge the type size and family",
         "sampleSnippet": "Sample snippet text, showing the leading and density at the current size.",
-        "sampleMeta": "Sample feed · 12 min ago"
+        "sampleMeta": "Sample feed · 12 min ago",
+        "waterfallTileWidth": "Image width",
+        "waterfallTileWidthHint": "Target width of each picture. Wider means fewer columns and larger pictures; columns then share the full width, so tiles end up at or just above this value."
     }
 }

@@ -214,16 +214,10 @@ const GROUPS: LayoutGroupDef[] = [
         items: [
             {
                 key: "waterfallMinColumnWidth",
-                labelKey: "layout.waterfallMinColumnWidth",
+                labelKey: "layout.waterfallTileWidth",
+                hintKey: "layout.waterfallTileWidthHint",
             },
             { key: "waterfallGap", labelKey: "layout.waterfallGap" },
-            {
-                key: "waterfallMaxColumns",
-                labelKey: "layout.waterfallMaxColumns",
-                unitKey: "layout.unitColumns",
-                zeroKey: "layout.unitUnlimited",
-                hintKey: "layout.waterfallMaxColumnsHint",
-            },
             {
                 key: "waterfallMaxTiles",
                 labelKey: "layout.waterfallMaxTiles",
@@ -231,12 +225,7 @@ const GROUPS: LayoutGroupDef[] = [
                 hintKey: "layout.waterfallMaxTilesHint",
             },
         ],
-        keys: [
-            "waterfallMinColumnWidth",
-            "waterfallGap",
-            "waterfallMaxColumns",
-            "waterfallMaxTiles",
-        ],
+        keys: ["waterfallMinColumnWidth", "waterfallGap", "waterfallMaxTiles"],
     },
 ]
 

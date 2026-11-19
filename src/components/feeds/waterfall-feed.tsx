@@ -204,7 +204,6 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
     const gap = layout.waterfallGap
     const minColumnWidth = layout.waterfallMinColumnWidth
     const maxTiles = layout.waterfallMaxTiles
-    const maxColumns = layout.waterfallMaxColumns
     const [width, setWidth] = useState(0)
     // Measured height/width per tile; pictures report theirs when they load.
     const [ratios, setRatios] = useState<Map<string, number>>(new Map())
@@ -275,13 +274,12 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
         })
     }, [])
 
-    // Derived from the container as it always was, then capped. The slider's
-    // floor is 2, so a wide window cannot end up with dozens of narrow columns;
-    // the cap only ever makes columns wider than the minimum, never leaves the
-    // row short of space.
-    const columnCount = Math.min(
-        Math.max(1, Math.floor((width + gap) / (minColumnWidth + gap))),
-        Math.max(2, maxColumns)
+    // The column count is what the tile width asks for: a wider target fits
+    // fewer columns. Columns then share the full width, so tiles end up at or
+    // just above the target and the row is never left short of space.
+    const columnCount = Math.max(
+        1,
+        Math.floor((width + gap) / (minColumnWidth + gap))
     )
     const columnWidth =
         columnCount > 0
