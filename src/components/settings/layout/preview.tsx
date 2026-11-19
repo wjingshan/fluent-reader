@@ -1,6 +1,6 @@
 import * as React from "react"
 import intl from "react-intl-universal"
-import { makeStyles } from "@griffel/react"
+import { makeStyles, mergeClasses } from "@griffel/react"
 import { LayoutConfig, ViewType } from "../../../schema-types"
 import { cardFontStack } from "../../../scripts/layout"
 
@@ -43,9 +43,19 @@ const useStyles = makeStyles({
         overflow: "hidden",
         borderBottom: "1px solid var(--neutralQuaternaryAlt)",
     },
+    // A flat grey block reads as an empty placeholder, which made the preview
+    // look broken. A soft gradient plus a picture glyph stands in for a cover
+    // without needing a network image.
     cover: {
         backgroundColor: "var(--neutralLight)",
+        backgroundImage:
+            "linear-gradient(135deg, var(--neutralQuaternaryAlt) 0%, var(--neutralLight) 55%, var(--neutralLighter) 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--neutralTertiary)",
         flexShrink: 0,
+        overflow: "hidden",
     },
     title: {
         "fontWeight": 600,
@@ -67,6 +77,23 @@ type Stage = {
     width: number
     height: number
     content: React.ReactNode
+}
+
+/** Picture glyph so a cover reads as an image instead of an empty box. */
+function CoverGlyph({ size }: { size: number }) {
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 20 20"
+            aria-hidden="true"
+            focusable="false">
+            <path
+                d="M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v11A1.5 1.5 0 0 1 15.5 17h-11A1.5 1.5 0 0 1 3 15.5v-11Zm1.5 7.34 2.6-2.6a1 1 0 0 1 1.41 0L11 11.6l1.1-1.1a1 1 0 0 1 1.41 0l2-2V4.5h-11v7.34Zm11 2.16v-.79l-2-2-1.1 1.1 2.6 2.6h.5v-.91ZM6.75 8.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"
+                fill="currentColor"
+            />
+        </svg>
+    )
 }
 
 export type LayoutPreviewProps = {
@@ -115,8 +142,9 @@ function cardsStage(config: LayoutConfig, classes: any): Stage {
                 }}>
                 <div
                     className={classes.cover}
-                    style={{ height: `${coverHeight}px` }}
-                />
+                    style={{ height: `${coverHeight}px` }}>
+                    <CoverGlyph size={Math.max(16, coverHeight * 0.3)} />
+                </div>
                 <div style={{ padding: "6px 10px", overflow: "hidden" }}>
                     <div
                         className={classes.title}
@@ -170,8 +198,9 @@ function listStage(config: LayoutConfig, classes: any): Stage {
                         width: `${cover}px`,
                         height: `${cover}px`,
                         margin: "8px 0 8px 10px",
-                    }}
-                />
+                    }}>
+                    <CoverGlyph size={Math.max(14, cover * 0.28)} />
+                </div>
                 <div
                     style={{
                         flexGrow: 1,
@@ -237,8 +266,9 @@ function magazineStage(config: LayoutConfig, classes: any): Stage {
                         width: `${Math.round(cover * 1.25)}px`,
                         height: `${cover}px`,
                         marginRight: "25px",
-                    }}
-                />
+                    }}>
+                    <CoverGlyph size={Math.max(14, cover * 0.3)} />
+                </div>
                 <div
                     style={{
                         flexGrow: 1,
@@ -357,19 +387,38 @@ function waterfallStage(config: LayoutConfig, classes: any): Stage {
         0,
         columns
     )
+    const text = previewText()
     const blocks = heights.map((height, index) => (
         <div
             key={index}
-            className={classes.card}
+            className={mergeClasses(classes.card, classes.cover)}
             style={{
                 width: `${columnWidth}px`,
                 height: `${height}px`,
                 marginRight: index === columns - 1 ? 0 : `${gap}px`,
                 flexShrink: 0,
                 flexGrow: 1,
-                backgroundColor: "var(--neutralLight)",
-            }}
-        />
+                flexDirection: "column",
+                gap: "4px",
+                padding: "6px",
+                fontFamily: cardFontStack(config.cardFont),
+            }}>
+            <CoverGlyph size={Math.max(16, Math.round(columnWidth * 0.16))} />
+            <span
+                style={{
+                    fontSize: `${Math.max(9, config.cardTitleSize - 5)}px`,
+                    fontWeight: 600,
+                    color: "var(--neutralDark)",
+                    textAlign: "center",
+                    lineHeight: 1.25,
+                    display: "-webkit-box",
+                    WebkitLineClamp: "2",
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                }}>
+                {text.title}
+            </span>
+        </div>
     ))
     return {
         width: columns * columnWidth + gap * (columns - 1),

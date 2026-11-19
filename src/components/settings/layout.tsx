@@ -68,13 +68,12 @@ const useStyles = makeStyles({
         alignItems: "center",
         gap: "10px",
     },
-    // Two columns: a setting that owns a whole row of its own (the font picker)
-    // spans both, everything else fills the next free cell. This keeps the panel
-    // from wasting the right half of a wide window.
+    // Three columns: a setting that owns a whole row of its own (the font picker)
+    // spans all of them, everything else fills the next free cell.
     sectionBody: {
         display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-        columnGap: "36px",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        columnGap: "28px",
         rowGap: "10px",
     },
     itemWide: {
@@ -121,6 +120,9 @@ type LayoutGroupDef = {
     // The card font picker belongs to the shared group only.
     font?: boolean
     keys: (keyof LayoutConfig)[]
+    // Which preview view this group belongs to. Absent means it applies to every
+    // view (the shared metrics), so it stays visible whatever is selected.
+    view?: ViewType
 }
 
 const GROUPS: LayoutGroupDef[] = [
@@ -142,6 +144,7 @@ const GROUPS: LayoutGroupDef[] = [
     {
         key: "cards",
         titleKey: "layout.groupCards",
+        view: ViewType.Cards,
         items: [
             { key: "cardsColumnWidth", labelKey: "layout.cardsColumnWidth" },
             { key: "cardsRowHeight", labelKey: "layout.cardsRowHeight" },
@@ -151,6 +154,7 @@ const GROUPS: LayoutGroupDef[] = [
     {
         key: "list",
         titleKey: "layout.groupList",
+        view: ViewType.List,
         items: [
             { key: "listCoverHeight", labelKey: "layout.listCoverHeight" },
             { key: "listTitleSize", labelKey: "layout.listTitleSize" },
@@ -160,6 +164,7 @@ const GROUPS: LayoutGroupDef[] = [
     {
         key: "magazine",
         titleKey: "layout.groupMagazine",
+        view: ViewType.Magazine,
         items: [
             {
                 key: "magazineCoverHeight",
@@ -171,6 +176,7 @@ const GROUPS: LayoutGroupDef[] = [
     {
         key: "compact",
         titleKey: "layout.groupCompact",
+        view: ViewType.Compact,
         items: [
             { key: "compactRowHeight", labelKey: "layout.compactRowHeight" },
         ],
@@ -179,6 +185,7 @@ const GROUPS: LayoutGroupDef[] = [
     {
         key: "waterfall",
         titleKey: "layout.groupWaterfall",
+        view: ViewType.Customized,
         items: [
             {
                 key: "waterfallMinColumnWidth",
@@ -277,6 +284,66 @@ const LayoutTab: React.FC = () => {
     const setValue = (key: LayoutNumberKey, value: number) =>
         dispatch(updateLayoutConfig({ [key]: value } as Partial<LayoutConfig>))
 
+    const renderGroup = (group: LayoutGroupDef) => (
+        <section key={group.key} className={classes.section}>
+            <div className={classes.sectionHead}>
+                <h3 className={classes.sectionTitle}>
+                    {intl.get(group.titleKey)}
+                </h3>
+                <DefaultButton
+                    text={intl.get("layout.resetGroup")}
+                    disabled={!isChanged(layout, group.keys)}
+                    onClick={() => dispatch(resetLayoutConfig(group.keys))}
+                />
+            </div>
+            <div className={classes.sectionBody}>
+                {group.font ? (
+                    <div
+                        className={mergeClasses(
+                            classes.item,
+                            classes.itemWide
+                        )}>
+                        <div className={classes.itemHead}>
+                            <span className={classes.itemLabel}>
+                                {intl.get("layout.cardFont")}
+                            </span>
+                            <span className={classes.itemValue}>
+                                {resolvedFont}
+                            </span>
+                        </div>
+                        <Dropdown
+                            className={classes.dropdown}
+                            options={fontOptions}
+                            selectedKey={layout.cardFont || SYSTEM_FONT_KEY}
+                            ariaLabel={intl.get("layout.cardFont")}
+                            onChange={(_, option) =>
+                                dispatch(
+                                    updateLayoutConfig({
+                                        cardFont:
+                                            option.key === SYSTEM_FONT_KEY
+                                                ? ""
+                                                : String(option.key),
+                                    })
+                                )
+                            }
+                        />
+                        <span className={classes.hint}>
+                            {intl.get("layout.cardFontHint")}
+                        </span>
+                    </div>
+                ) : null}
+                {group.items.map(item => (
+                    <NumberRow
+                        key={item.key}
+                        def={item}
+                        value={layout[item.key]}
+                        onChange={setValue}
+                    />
+                ))}
+            </div>
+        </section>
+    )
+
     return (
         <div className={`tab-body ${classes.root}`}>
             <div className={classes.toolbar}>
@@ -294,6 +361,10 @@ const LayoutTab: React.FC = () => {
                 />
             </div>
             <span className={classes.hint}>{intl.get("layout.intro")}</span>
+
+            {/* The shared metrics come first: they modulate every view below, so
+                reading them before the per-view block matches how they apply. */}
+            {GROUPS.filter(group => group.key === "common").map(renderGroup)}
 
             <section className={classes.section}>
                 <div className={classes.previewRow}>
@@ -316,7 +387,15 @@ const LayoutTab: React.FC = () => {
                 </span>
             </section>
 
-            {GROUPS.map(group => (
+            {GROUPS.filter(
+                // Compare against undefined on purpose: ViewType.Cards is 0, so a
+                // truthiness check would keep the cards group visible forever.
+                // "common" is rendered above the preview instead, so it is
+                // skipped here.
+                group =>
+                    group.key !== "common" &&
+                    (group.view === undefined || group.view === previewView)
+            ).map(group => (
                 <section key={group.key} className={classes.section}>
                     <div className={classes.sectionHead}>
                         <h3 className={classes.sectionTitle}>
