@@ -11,7 +11,7 @@ import {
     PrimaryButton,
     Slider,
 } from "@fluentui/react"
-import { makeStyles } from "@griffel/react"
+import { makeStyles, mergeClasses } from "@griffel/react"
 import {
     countCustomLayout,
     DEFAULT_LAYOUT_CONFIG,
@@ -67,6 +67,18 @@ const useStyles = makeStyles({
         display: "flex",
         alignItems: "center",
         gap: "10px",
+    },
+    // Two columns: a setting that owns a whole row of its own (the font picker)
+    // spans both, everything else fills the next free cell. This keeps the panel
+    // from wasting the right half of a wide window.
+    sectionBody: {
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        columnGap: "36px",
+        rowGap: "10px",
+    },
+    itemWide: {
+        gridColumn: "1 / -1",
     },
     sectionTitle: {
         flexGrow: 1,
@@ -318,45 +330,54 @@ const LayoutTab: React.FC = () => {
                             }
                         />
                     </div>
-                    {group.font ? (
-                        <div className={classes.item}>
-                            <div className={classes.itemHead}>
-                                <span className={classes.itemLabel}>
-                                    {intl.get("layout.cardFont")}
-                                </span>
-                                <span className={classes.itemValue}>
-                                    {resolvedFont}
+                    <div className={classes.sectionBody}>
+                        {group.font ? (
+                            <div
+                                className={mergeClasses(
+                                    classes.item,
+                                    classes.itemWide
+                                )}>
+                                <div className={classes.itemHead}>
+                                    <span className={classes.itemLabel}>
+                                        {intl.get("layout.cardFont")}
+                                    </span>
+                                    <span className={classes.itemValue}>
+                                        {resolvedFont}
+                                    </span>
+                                </div>
+                                <Dropdown
+                                    className={classes.dropdown}
+                                    options={fontOptions}
+                                    selectedKey={
+                                        layout.cardFont || SYSTEM_FONT_KEY
+                                    }
+                                    ariaLabel={intl.get("layout.cardFont")}
+                                    onChange={(_, option) =>
+                                        dispatch(
+                                            updateLayoutConfig({
+                                                cardFont:
+                                                    option.key ===
+                                                    SYSTEM_FONT_KEY
+                                                        ? ""
+                                                        : String(option.key),
+                                            })
+                                        )
+                                    }
+                                />
+                                <span className={classes.hint}>
+                                    {intl.get("layout.cardFontHint")}
                                 </span>
                             </div>
-                            <Dropdown
-                                className={classes.dropdown}
-                                options={fontOptions}
-                                selectedKey={layout.cardFont || SYSTEM_FONT_KEY}
-                                ariaLabel={intl.get("layout.cardFont")}
-                                onChange={(_, option) =>
-                                    dispatch(
-                                        updateLayoutConfig({
-                                            cardFont:
-                                                option.key === SYSTEM_FONT_KEY
-                                                    ? ""
-                                                    : String(option.key),
-                                        })
-                                    )
-                                }
+                        ) : null}
+                        {group.items.map(item => (
+                            <NumberRow
+                                key={item.key}
+                                def={item}
+                                value={layout[item.key]}
+                                onChange={setValue}
                             />
-                            <span className={classes.hint}>
-                                {intl.get("layout.cardFontHint")}
-                            </span>
-                        </div>
-                    ) : null}
-                    {group.items.map(item => (
-                        <NumberRow
-                            key={item.key}
-                            def={item}
-                            value={layout[item.key]}
-                            onChange={setValue}
-                        />
-                    ))}
+                        ))}
+                    </div>
                 </section>
             ))}
 
