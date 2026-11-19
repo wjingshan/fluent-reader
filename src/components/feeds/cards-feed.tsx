@@ -1,15 +1,29 @@
 import * as React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import intl from "react-intl-universal"
+import { makeStyles, mergeClasses } from "@griffel/react"
 import { FeedProps } from "./feed"
 import DefaultCard from "../cards/default-card"
 import { RSSItem } from "../../scripts/models/item"
 import { FocusZone, List, AnimationClassNames } from "@fluentui/react"
 import { useFeedTabStop } from "../utils/hooks/useFeedTabStop"
+import { useAppSelector } from "../../scripts/reducer"
 import { FeedEnd } from "./feed-end"
 
+const useStyles = makeStyles({
+    // The filler that keeps the last row aligned has to be as wide as one
+    // cell, which the layout settings own now.
+    flexFix: { minWidth: "var(--fr-cards-column-width, 280px)" },
+})
+
 const CardsFeed: React.FC<FeedProps> = props => {
+    const classes = useStyles()
     const { elementRef, onPagesUpdated } = useFeedTabStop()
+    const layout = useAppSelector(s => s.app.layout)
+    // The page is cut into cells of this size; the card itself is the cell
+    // minus its gutters (see default-card.tsx).
+    const cellWidth = layout.cardsColumnWidth
+    const cellHeight = layout.cardsRowHeight
     const [width, setWidth] = useState(window.innerWidth)
     const [height, setHeight] = useState(window.innerHeight)
     const observerRef = useRef<ResizeObserver>(null)
@@ -31,17 +45,17 @@ const CardsFeed: React.FC<FeedProps> = props => {
     }, [])
 
     const getItemCountForPage = useCallback(() => {
-        let elemPerRow = Math.floor(width / 280)
-        let rows = Math.ceil(height / 304)
+        let elemPerRow = Math.floor(width / cellWidth)
+        let rows = Math.ceil(height / cellHeight)
         return elemPerRow * rows
-    }, [width, height])
+    }, [width, height, cellWidth, cellHeight])
 
     const getPageHeight = useCallback(() => {
-        return height + (304 - (height % 304))
-    }, [height])
+        return height + (cellHeight - (height % cellHeight))
+    }, [height, cellHeight])
 
     const flexFixItems = () => {
-        let elemPerRow = Math.floor(width / 280)
+        let elemPerRow = Math.floor(width / cellWidth)
         let elemLastRow = props.items.length % elemPerRow
         let items = [...props.items]
         for (let i = 0; i < elemPerRow - elemLastRow; i += 1) items.push(null)
@@ -62,7 +76,9 @@ const CardsFeed: React.FC<FeedProps> = props => {
                 showItem={props.showItem}
             />
         ) : (
-            <div className="flex-fix" key={"f-" + index}></div>
+            <div
+                className={mergeClasses("flex-fix", classes.flexFix)}
+                key={"f-" + index}></div>
         )
 
     return (

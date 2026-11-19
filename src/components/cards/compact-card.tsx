@@ -16,11 +16,12 @@ const useStyles = makeStyles({
     // overflow hidden, and the box keeps a 31px floor.
     layout: {
         "height": "auto",
-        "minHeight": "31px",
+        "minHeight": "var(--fr-compact-row-height, 31px)",
         "boxSizing": "border-box",
         "padding": "4px 34px 4px 9px",
         "alignItems": "center",
-        "lineHeight": "18px",
+        "lineHeight": "var(--fr-compact-line-height, 18px)",
+        "fontFamily": "var(--fr-card-font-family, inherit)",
         "& .data": {
             display: "flex",
             flexDirection: "column",
@@ -35,18 +36,21 @@ const useStyles = makeStyles({
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             marginRight: 0,
-            lineHeight: "18px",
+            // 2px under the shared card title size, which is the 14px this
+            // row inherited before the size became adjustable.
+            fontSize: "calc(var(--fr-card-title-size, 16px) - 2px)",
+            lineHeight: "var(--fr-compact-line-height, 18px)",
         },
         "& .data .snippet": {
             display: "block",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            fontSize: "12px",
-            lineHeight: "16px",
+            fontSize: "calc(var(--fr-card-snippet-size, 14px) - 2px)",
+            lineHeight: "calc(var(--fr-compact-line-height, 18px) - 2px)",
         },
         "& .info": {
-            lineHeight: "18px",
+            lineHeight: "var(--fr-compact-line-height, 18px)",
             alignItems: "center",
         },
     },

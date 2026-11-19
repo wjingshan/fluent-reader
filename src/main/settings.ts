@@ -13,11 +13,13 @@ import {
     getRuleTargetKey,
     ARTICLE_OVERLAY_MIN_WIDTH,
     LIST_VIEW_MIN_WIDTH,
+    LayoutConfig,
+    DEFAULT_LAYOUT_CONFIG,
+    normalizeLayoutConfig,
 } from "../schema-types"
 import { ipcMain, session, nativeTheme, app } from "electron"
 import { WindowManager } from "./window"
 import { transformLovefieldRules } from "./utils"
-
 export const store = new Store<SchemaTypes>({ cache: true })
 
 const GROUPS_STORE_KEY = "sourceGroups"
@@ -333,4 +335,17 @@ ipcMain.on("get-duplicate-filter", event => {
 })
 ipcMain.handle("set-duplicate-filter", (_, mode: number) => {
     store.set(DUPLICATE_FILTER_STORE_KEY, Number(mode) === 1 ? 1 : 0)
+})
+
+// Card-list display metrics. A record saved by an older build (or edited by
+// hand) may miss fields or carry out-of-range values, so it is normalized on
+// both reads and writes: the renderer always receives a complete config.
+const LAYOUT_CONFIG_STORE_KEY = "layoutConfig"
+ipcMain.on("get-layout-config", event => {
+    event.returnValue = normalizeLayoutConfig(
+        store.get(LAYOUT_CONFIG_STORE_KEY, DEFAULT_LAYOUT_CONFIG)
+    )
+})
+ipcMain.handle("set-layout-config", (_, config: LayoutConfig) => {
+    store.set(LAYOUT_CONFIG_STORE_KEY, normalizeLayoutConfig(config))
 })

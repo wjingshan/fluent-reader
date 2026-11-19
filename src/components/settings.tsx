@@ -10,6 +10,7 @@ import GroupsTab from "./settings/groups"
 import AppTabContainer from "../containers/settings/app-container"
 import RulesTab from "./settings/rules"
 import ServiceTabContainer from "../containers/settings/service-container"
+import LayoutTab from "./settings/layout"
 import { initTouchBarWithTexts } from "../scripts/utils"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
 import { exitSettings } from "../scripts/models/app"
@@ -111,6 +112,11 @@ const Settings: React.FC = () => {
                             headerText={intl.get("settings.app")}
                             itemIcon="Settings">
                             <AppTabContainer />
+                        </PivotItem>
+                        <PivotItem
+                            headerText={intl.get("settings.layout")}
+                            itemIcon="ViewAll">
+                            <LayoutTab />
                         </PivotItem>
                         <PivotItem
                             headerText={intl.get("settings.about")}

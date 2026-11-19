@@ -102,7 +102,6 @@ if (process.argv[2] === "apply") {
             console.log("dist replaced from " + distOverride)
         }
 
-
         // 1) the three patch files
         for (const name of PATCH_FILES) {
             const from = path.join(patchSrcDir, name)
@@ -133,7 +132,7 @@ if (process.argv[2] === "apply") {
         if (/Content-Security-Policy/i.test(html)) {
             html = html.replace(
                 /(content="[^"]*)(")/i,
-                '$1; media-src https: http: blob:$2'
+                "$1; media-src https: http: blob:$2"
             )
         } else {
             html = html.replace(

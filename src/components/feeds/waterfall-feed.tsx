@@ -7,15 +7,12 @@ import { FeedProps } from "./feed"
 import WaterfallCard, { WaterfallMedia } from "../cards/waterfall-card"
 import { RSSItem } from "../../scripts/models/item"
 import { useFeedTabStop } from "../utils/hooks/useFeedTabStop"
+import { useAppSelector } from "../../scripts/reducer"
 import { FeedEnd } from "./feed-end"
 
-const GAP = 12
 // An article with several pictures is folded into one stack by default; after
-// expanding, this caps how many tiles it may occupy.
-const MAX_TILES_PER_ITEM = 12
-// Room under the picture for the stacked sheets to peek out.
+// expanding, the layout setting caps how many tiles it may occupy.
 const STACK_PEEK = 10
-const MIN_COLUMN_WIDTH = 200
 // Height / width used until the picture reports its own size.
 const DEFAULT_RATIO = 0.75
 const TEXT_CARD_HEIGHT = 108
@@ -97,7 +94,7 @@ function mediaKey(url: string): string {
  * Videos count as items too: a clip-only post used to report a single picture,
  * which hid the expand control even though the post clearly holds more.
  */
-function mediaOf(item: RSSItem): WaterfallMedia[] {
+function mediaOf(item: RSSItem, maxTiles: number): WaterfallMedia[] {
     const content = item.content || ""
     const base = baseFor(item.link || "")
     const out: WaterfallMedia[] = []
@@ -149,17 +146,18 @@ function mediaOf(item: RSSItem): WaterfallMedia[] {
     out.push(...clips)
     if (out.length === 0 && item.thumb)
         out.push({ kind: "image", url: item.thumb })
-    return out.slice(0, MAX_TILES_PER_ITEM)
+    return out.slice(0, maxTiles)
 }
 
 function buildTiles(
     items: RSSItem[],
     expanded: Set<number>,
-    flipIndex: Map<number, number>
+    flipIndex: Map<number, number>,
+    maxTiles: number
 ): Tile[] {
     const tiles: Tile[] = []
     for (const item of items) {
-        const media = mediaOf(item)
+        const media = mediaOf(item, maxTiles)
         if (media.length === 0) {
             tiles.push({
                 key: item._id + ":0",
@@ -202,6 +200,10 @@ function buildTiles(
 const WaterfallFeed: React.FC<FeedProps> = props => {
     const styles = useStyles()
     const { elementRef, onPagesUpdated } = useFeedTabStop()
+    const layout = useAppSelector(s => s.app.layout)
+    const gap = layout.waterfallGap
+    const minColumnWidth = layout.waterfallMinColumnWidth
+    const maxTiles = layout.waterfallMaxTiles
     const [width, setWidth] = useState(0)
     // Measured height/width per tile; pictures report theirs when they load.
     const [ratios, setRatios] = useState<Map<string, number>>(new Map())
@@ -226,8 +228,8 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
 
     // Parsing every article's HTML is only worth doing when the items change.
     const tiles = useMemo(
-        () => buildTiles(props.items, expanded, flipIndex),
-        [props.items, expanded, flipIndex]
+        () => buildTiles(props.items, expanded, flipIndex, maxTiles),
+        [props.items, expanded, flipIndex, maxTiles]
     )
 
     // Collect picture sizes without re-laying out for every single image.
@@ -274,11 +276,11 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
 
     const columnCount = Math.max(
         1,
-        Math.floor((width + GAP) / (MIN_COLUMN_WIDTH + GAP))
+        Math.floor((width + gap) / (minColumnWidth + gap))
     )
     const columnWidth =
         columnCount > 0
-            ? (width - GAP * (columnCount - 1)) / columnCount
+            ? (width - gap * (columnCount - 1)) / columnCount
             : width
 
     const placements = useMemo(() => {
@@ -298,15 +300,15 @@ const WaterfallFeed: React.FC<FeedProps> = props => {
                 : TEXT_CARD_HEIGHT
             result.push({
                 key: index,
-                left: target * (columnWidth + GAP),
+                left: target * (columnWidth + gap),
                 top: heights[target],
                 width: columnWidth,
                 height,
             })
-            heights[target] += height + GAP
+            heights[target] += height + gap
         })
         return result
-    }, [tiles, columnCount, columnWidth, ratios])
+    }, [tiles, columnCount, columnWidth, ratios, gap])
 
     const containerHeight = useMemo(() => {
         let max = 0

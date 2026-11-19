@@ -8,6 +8,7 @@ import {
     StoredRule,
     StoredRules,
     RuleTarget,
+    LayoutConfig,
 } from "../schema-types"
 import { ipcRenderer } from "electron"
 
@@ -184,6 +185,13 @@ const settingsBridge = {
     },
     setDuplicateFilter: (mode: number) => {
         ipcRenderer.invoke("set-duplicate-filter", mode)
+    },
+
+    getLayoutConfig: (): LayoutConfig => {
+        return ipcRenderer.sendSync("get-layout-config")
+    },
+    setLayoutConfig: (config: LayoutConfig): Promise<void> => {
+        return ipcRenderer.invoke("set-layout-config", config)
     },
 }
 

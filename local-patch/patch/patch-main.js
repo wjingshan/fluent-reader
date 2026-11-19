@@ -15,8 +15,7 @@ const { app, session } = require("electron")
 // because a packaged Electron app prints nothing when it dies early.
 // Defaults to the app's own userData dir; override with FR_LOG.
 const LOG_PATH =
-    process.env.FR_LOG ||
-    path.join(app.getPath("userData"), "media-patch.log")
+    process.env.FR_LOG || path.join(app.getPath("userData"), "media-patch.log")
 function trace(...args) {
     if (!LOG_PATH) return
     const line = `${new Date().toISOString()} ${args.join(" ")}\n`
@@ -32,7 +31,12 @@ function trace(...args) {
         /* nothing else we can do */
     }
 }
-trace("=== patch-main start, pid", process.pid, "argv:", process.argv.slice(1).join(" "))
+trace(
+    "=== patch-main start, pid",
+    process.pid,
+    "argv:",
+    process.argv.slice(1).join(" ")
+)
 process.on("uncaughtException", err => {
     trace("UNCAUGHT", err && err.stack ? err.stack : String(err))
 })
@@ -396,12 +400,7 @@ if (process.env.FR_SELFCHECK) {
                 })
                 await new Promise(r => setTimeout(r, 6000))
                 const eagleAfter = await eagleItemCount()
-                trace(
-                    "SELFCHECK eagle items:",
-                    eagleBefore,
-                    "->",
-                    eagleAfter
-                )
+                trace("SELFCHECK eagle items:", eagleBefore, "->", eagleAfter)
                 const label = await wc.executeJavaScript(`(() => {
                     const btn = document.querySelector('button.fr-eagle-btn')
                     return btn ? btn.textContent + ' | ' + btn.title : 'no button'
@@ -586,7 +585,8 @@ if (process.env.FR_SELFCHECK) {
                     // Second path: the per-source context menu entry 刷新.
                     // Wait for the first toast to clear, then drive the menu.
                     await new Promise(r => setTimeout(r, 3800))
-                    const menuResult = await wc.executeJavaScript(`(async () => {
+                    const menuResult =
+                        await wc.executeJavaScript(`(async () => {
                         const sleep = ms => new Promise(r => setTimeout(r, ms))
                         const items = [...document.querySelectorAll('[role="treeitem"], .fui-TreeItem')]
                         const src = items.find(el => /JoyReactor|GIF/i.test(el.textContent || ''))
@@ -626,4 +626,3 @@ if (process.env.FR_SELFCHECK) {
         }
     }, delay)
 }
-

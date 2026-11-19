@@ -35,6 +35,11 @@ import {
 import { getCurrentLocale } from "../settings"
 import locales from "../i18n/_locales"
 import { SYNC_SERVICE, ServiceActionTypes } from "./service"
+import {
+    DEFAULT_LAYOUT_CONFIG,
+    LayoutConfig,
+    normalizeLayoutConfig,
+} from "../../schema-types"
 
 export const enum ContextMenuType {
     Hidden,
@@ -97,6 +102,12 @@ export class AppState {
         notify: false,
         logs: new Array<AppLog>(),
     }
+
+    // Card-list display metrics. Loaded once at startup so every view can read
+    // them synchronously; changes are applied through updateLayoutConfig.
+    layout: LayoutConfig = normalizeLayoutConfig(
+        globalThis.settings.getLayoutConfig()
+    )
 
     // Item ids that the most recent "mark all as read" actually changed, so the
     // action can be undone. null means there is nothing to undo.
@@ -223,6 +234,7 @@ export interface MenuActionTypes {
 export const TOGGLE_SETTINGS = "TOGGLE_SETTINGS"
 export const SAVE_SETTINGS = "SAVE_SETTINGS"
 export const FREE_MEMORY = "FREE_MEMORY"
+export const SET_LAYOUT_CONFIG = "SET_LAYOUT_CONFIG"
 
 interface ToggleSettingsAction {
     type: typeof TOGGLE_SETTINGS
@@ -236,10 +248,78 @@ interface FreeMemoryAction {
     type: typeof FREE_MEMORY
     iids: Set<number>
 }
+interface SetLayoutConfigAction {
+    type: typeof SET_LAYOUT_CONFIG
+    config: LayoutConfig
+}
 export type SettingsActionTypes =
     | ToggleSettingsAction
     | SaveSettingsAction
     | FreeMemoryAction
+
+export type LayoutActionTypes = SetLayoutConfigAction
+
+// Dragging a slider emits one change per step, so the electron-store write is
+// coalesced while the Redux store still updates on every step (the feeds and
+// the preview follow live). Leaving settings flushes whatever is pending.
+let layoutSaveTimer: NodeJS.Timeout = null
+let pendingLayout: LayoutConfig = null
+
+function persistLayout(config: LayoutConfig, immediate = false) {
+    pendingLayout = config
+    if (layoutSaveTimer) clearTimeout(layoutSaveTimer)
+    layoutSaveTimer = null
+    if (immediate) {
+        pendingLayout = null
+        globalThis.settings.setLayoutConfig(config)
+        return
+    }
+    layoutSaveTimer = setTimeout(() => {
+        layoutSaveTimer = null
+        const pending = pendingLayout
+        pendingLayout = null
+        if (pending) globalThis.settings.setLayoutConfig(pending)
+    }, 150)
+}
+
+export function flushLayoutConfig() {
+    if (!layoutSaveTimer || !pendingLayout) return
+    clearTimeout(layoutSaveTimer)
+    layoutSaveTimer = null
+    const pending = pendingLayout
+    pendingLayout = null
+    globalThis.settings.setLayoutConfig(pending)
+}
+
+export function updateLayoutConfig(patch: Partial<LayoutConfig>): AppThunk {
+    return (dispatch, getState) => {
+        const next = normalizeLayoutConfig({
+            ...getState().app.layout,
+            ...patch,
+        })
+        dispatch({ type: SET_LAYOUT_CONFIG, config: next })
+        persistLayout(next)
+    }
+}
+
+// Passing keys resets only that group; omitting them restores the whole tab.
+export function resetLayoutConfig(keys?: (keyof LayoutConfig)[]): AppThunk {
+    return (dispatch, getState) => {
+        const next = { ...getState().app.layout }
+        const target = next as unknown as Record<string, number | string>
+        const source = DEFAULT_LAYOUT_CONFIG as unknown as Record<
+            string,
+            number | string
+        >
+        const targets =
+            keys ||
+            (Object.keys(DEFAULT_LAYOUT_CONFIG) as (keyof LayoutConfig)[])
+        for (const key of targets) target[key] = source[key]
+        const normalized = normalizeLayoutConfig(next)
+        dispatch({ type: SET_LAYOUT_CONFIG, config: normalized })
+        persistLayout(normalized, true)
+    }
+}
 
 export function closeContextMenu(): AppThunk {
     return (dispatch, getState) => {
@@ -322,6 +402,7 @@ export const toggleSettings = (open = true, sids = new Array<number>()) => ({
 
 export function exitSettings(): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
+        flushLayoutConfig()
         if (!getState().app.settings.saving) {
             if (getState().app.settings.changed) {
                 dispatch(saveSettings())
@@ -469,6 +550,7 @@ export function appReducer(
         | SourceGroupActionTypes
         | ServiceActionTypes
         | MarkAllUndoActionTypes
+        | LayoutActionTypes
 ): AppState {
     switch (action.type) {
         case INIT_INTL:
@@ -733,6 +815,11 @@ export function appReducer(
                     sids: action.sids,
                     saving: false,
                 },
+            }
+        case SET_LAYOUT_CONFIG:
+            return {
+                ...state,
+                layout: action.config,
             }
         case TOGGLE_LOGS:
             return {

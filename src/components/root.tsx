@@ -17,6 +17,7 @@ import { ThemeProvider } from "@fluentui/react"
 import { CUSTOM_STYLE_HOOKS, createAppTheme } from "./utils/theme"
 import { CustomStyleHooksProvider_unstable as CustomStyleHooksProvider } from "@fluentui/react-shared-contexts"
 import { getFontFamilyForLocale } from "../scripts/settings"
+import { applyLayoutVariables } from "../scripts/layout"
 import { useArticleOverlayOpen } from "./utils/hooks/useArticleOverlayOpen"
 
 const useClasses = makeStyles({
@@ -49,6 +50,10 @@ const Root: React.FC = () => {
     const [isDarkMode, setIsDarkMode] = useState(() =>
         globalThis.settings.shouldUseDarkColors()
     )
+    const layout = useAppSelector(s => s.app.layout)
+    useEffect(() => {
+        applyLayoutVariables(layout)
+    }, [layout])
     useEffect(() => {
         globalThis.settings.addThemeUpdateListener(shouldDark => {
             setIsDarkMode(shouldDark)

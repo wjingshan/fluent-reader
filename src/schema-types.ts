@@ -38,6 +38,102 @@ export const enum ViewConfigs {
     FadeRead = 1 << 2,
 }
 
+// Display metrics per view. These are the card-list look, not the article
+// reading area: `fontSize` / `fontFamily` above belong to the article body.
+export interface LayoutConfig {
+    cardTitleSize: number
+    cardSnippetSize: number
+    // Empty means "follow the app font". A value is one family name, unquoted.
+    cardFont: string
+    cardGap: number
+    cardsColumnWidth: number
+    cardsRowHeight: number
+    listCoverHeight: number
+    listTitleSize: number
+    magazineCoverHeight: number
+    compactRowHeight: number
+    waterfallMinColumnWidth: number
+    waterfallGap: number
+    waterfallMaxTiles: number
+}
+
+export type LayoutNumberKey = Exclude<keyof LayoutConfig, "cardFont">
+
+export const LAYOUT_RANGES: Record<
+    LayoutNumberKey,
+    { min: number; max: number; step: number }
+> = {
+    cardTitleSize: { min: 12, max: 24, step: 1 },
+    cardSnippetSize: { min: 10, max: 20, step: 1 },
+    cardGap: { min: 4, max: 28, step: 2 },
+    cardsColumnWidth: { min: 220, max: 420, step: 10 },
+    cardsRowHeight: { min: 260, max: 420, step: 10 },
+    listCoverHeight: { min: 48, max: 140, step: 4 },
+    listTitleSize: { min: 12, max: 22, step: 1 },
+    magazineCoverHeight: { min: 100, max: 280, step: 10 },
+    compactRowHeight: { min: 24, max: 56, step: 2 },
+    waterfallMinColumnWidth: { min: 140, max: 320, step: 10 },
+    waterfallGap: { min: 4, max: 32, step: 2 },
+    waterfallMaxTiles: { min: 2, max: 24, step: 1 },
+}
+
+export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
+    cardTitleSize: 16,
+    cardSnippetSize: 14,
+    cardFont: "",
+    cardGap: 12,
+    cardsColumnWidth: 280,
+    cardsRowHeight: 304,
+    listCoverHeight: 80,
+    listTitleSize: 14,
+    magazineCoverHeight: 160,
+    compactRowHeight: 31,
+    waterfallMinColumnWidth: 200,
+    waterfallGap: 12,
+    waterfallMaxTiles: 12,
+}
+
+export const LAYOUT_NUMBER_KEYS = Object.keys(
+    LAYOUT_RANGES
+) as LayoutNumberKey[]
+
+// A family name travels into a CSS custom property, so anything that could
+// break out of the declaration (quotes, commas, braces, semicolons) is dropped:
+// only letters, digits, spaces, hyphens and CJK ideographs survive.
+export function sanitizeFontFamily(font: unknown): string {
+    if (typeof font !== "string") return ""
+    return font
+        .replace(/[^A-Za-z0-9 \-\u3400-\u9fff]/g, "")
+        .trim()
+        .slice(0, 64)
+}
+
+export function normalizeLayoutConfig(
+    config: Partial<LayoutConfig> = null
+): LayoutConfig {
+    const result: LayoutConfig = { ...DEFAULT_LAYOUT_CONFIG }
+    if (!config || typeof config !== "object") return result
+    for (const key of LAYOUT_NUMBER_KEYS) {
+        const raw = Number(config[key])
+        if (!Number.isFinite(raw)) continue
+        const { min, max, step } = LAYOUT_RANGES[key]
+        const snapped = Math.round(raw / step) * step
+        result[key] = Math.min(max, Math.max(min, snapped))
+    }
+    result.cardFont = sanitizeFontFamily(config.cardFont)
+    return result
+}
+
+export function countCustomLayout(config: LayoutConfig): number {
+    const normalized = normalizeLayoutConfig(config)
+    let count = 0
+    for (const key of LAYOUT_NUMBER_KEYS) {
+        if (normalized[key] !== DEFAULT_LAYOUT_CONFIG[key]) count += 1
+    }
+    if (normalized.cardFont !== DEFAULT_LAYOUT_CONFIG.cardFont) count += 1
+    return count
+}
+
 export const enum ThemeSettings {
     Default = "system",
     Light = "light",
@@ -177,4 +273,6 @@ export type SchemaTypes = {
     // DeepSeek key for on-demand article translation. Falls back to
     // DEEPSEEK_API_KEY when empty (see main/translate.ts).
     translateApiKey: string
+    // Card-list display metrics (see layout.ts / components/settings/layout).
+    layoutConfig: LayoutConfig
 }

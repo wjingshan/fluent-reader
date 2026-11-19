@@ -5,7 +5,7 @@
 // joyreactor, ...) that thumb is a still JPEG, so the card never moves.
 // This shim reads each item's stored HTML through the app's own window.db
 // bridge, finds the real <video>/<source> URL, and hovers it into life.
-(() => {
+;(() => {
     "use strict"
     if (window.__frMediaPatch) return
     window.__frMediaPatch = true
@@ -13,7 +13,8 @@
 
     const log = (...args) => {
         window.__frMediaPatchLog.push(args.map(String).join(" "))
-        if (window.__frMediaPatchLog.length > 200) window.__frMediaPatchLog.shift()
+        if (window.__frMediaPatchLog.length > 200)
+            window.__frMediaPatchLog.shift()
         console.log("[fr-media-patch]", ...args)
     }
 
@@ -129,7 +130,8 @@
         return null
     }
 
-    async function loadMedia(iids) {        if (!window.db || !window.db.execute) {
+    async function loadMedia(iids) {
+        if (!window.db || !window.db.execute) {
             log("window.db not available — give up")
             return
         }
@@ -190,7 +192,9 @@
     // ---------------------------------------------------------------- decorate
 
     function decoratePending(iid) {
-        for (const card of document.querySelectorAll(`div[data-iid="${iid}"]`)) {
+        for (const card of document.querySelectorAll(
+            `div[data-iid="${iid}"]`
+        )) {
             decorate(card)
         }
     }
