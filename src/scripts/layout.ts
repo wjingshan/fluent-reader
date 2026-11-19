@@ -1,5 +1,9 @@
 import intl from "react-intl-universal"
-import { LayoutConfig, sanitizeHexColor } from "../schema-types"
+import {
+    cardsCellHeight,
+    LayoutConfig,
+    sanitizeHexColor,
+} from "../schema-types"
 import { RSSItem } from "./models/item"
 
 // Every adjustable card metric is published as a custom property on :root, so
@@ -20,7 +24,12 @@ export function applyLayoutVariables(config: LayoutConfig) {
         "--fr-cards-column-width",
         px(config.cardsColumnWidth + config.cardGap * 2)
     )
-    style.setProperty("--fr-cards-row-height", px(config.cardsRowHeight))
+    // The row height follows the card width, so the cards keep their shape at
+    // every width; the ratio lives in one place (CARDS_ROW_RATIO).
+    style.setProperty(
+        "--fr-cards-row-height",
+        px(cardsCellHeight(config.cardsColumnWidth))
+    )
     style.setProperty("--fr-card-title-size", px(config.cardTitleSize))
     style.setProperty("--fr-card-snippet-size", px(config.cardSnippetSize))
     style.setProperty("--fr-card-font-family", cardFontStack(config.cardFont))

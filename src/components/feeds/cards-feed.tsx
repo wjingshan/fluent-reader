@@ -5,6 +5,7 @@ import { makeStyles, mergeClasses } from "@griffel/react"
 import { FeedProps } from "./feed"
 import DefaultCard from "../cards/default-card"
 import { RSSItem } from "../../scripts/models/item"
+import { cardsCellHeight } from "../../schema-types"
 import { FocusZone, List, AnimationClassNames } from "@fluentui/react"
 import { useFeedTabStop } from "../utils/hooks/useFeedTabStop"
 import { useAppSelector } from "../../scripts/reducer"
@@ -21,9 +22,10 @@ const CardsFeed: React.FC<FeedProps> = props => {
     const { elementRef, onPagesUpdated } = useFeedTabStop()
     const layout = useAppSelector(s => s.app.layout)
     // The setting is the card's own width; the page is cut into cells that also
-    // hold the two gutters around the card (see default-card.tsx).
+    // hold the two gutters around the card (see default-card.tsx), and the cell's
+    // height follows the width so the cards keep their shape.
     const cellWidth = layout.cardsColumnWidth + layout.cardGap * 2
-    const cellHeight = layout.cardsRowHeight
+    const cellHeight = cardsCellHeight(layout.cardsColumnWidth)
     const [width, setWidth] = useState(window.innerWidth)
     const [height, setHeight] = useState(window.innerHeight)
     const observerRef = useRef<ResizeObserver>(null)

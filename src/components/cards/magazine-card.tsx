@@ -14,12 +14,15 @@ const useStyles = makeStyles({
     // follows whichever of cover and text is taller, unchanged at the defaults.
     metrics: {
         "maxHeight": "none",
-        // The window decides the width: the card fills it minus the inset on
-        // each side, and it never grows past the historical 700px card (which
-        // also shrinks by the same inset, so the control keeps working on wide
-        // windows instead of being swallowed by the cap).
+        // The card fills the window minus the inset on each side: inset 0 means
+        // edge to edge, and a large inset pulls it back to a comfortable
+        // reading width on a wide screen. The old fixed 700px cap is gone on
+        // purpose — it made every inset value a no-op on a wide window.
         "width": "calc(100% - 2 * var(--fr-magazine-inset, 0px))",
-        "maxWidth": "calc(700px - 2 * var(--fr-magazine-inset, 0px))",
+        // The static sheet leaves the card content-box, so a percentage width
+        // plus 48px of padding would overflow the window by exactly the padding
+        // and push the centring off by half of it.
+        "boxSizing": "border-box",
         "fontFamily": "var(--fr-card-font-family, inherit)",
         // The static sheet only sets a background on :hover, so the rest state
         // has to come from here. Both are variables: following the theme yields

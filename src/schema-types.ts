@@ -47,17 +47,17 @@ export interface LayoutConfig {
     cardFont: string
     cardGap: number
     // The card's own width. The grid cell is this plus the card's two gutters,
-    // because the feed cuts the page into cells and the card is what is left
-    // inside one (see cards-feed.tsx), so a single number drives both.
+    // and its height follows from the width (see CARDS_ROW_RATIO), so a card
+    // keeps its shape instead of being stretched or squashed.
     cardsColumnWidth: number
-    cardsRowHeight: number
     listCoverHeight: number
     listTitleSize: number
     // Snippet lines shown before the text is clamped.
     listSnippetLines: number
     magazineCoverHeight: number
-    // Blank kept on each side of the centred magazine card, on top of the gap the
-    // window already leaves. 0 keeps the historical 700px card.
+    // Blank kept on each side of the magazine card: the card is the window's
+    // width minus twice this. 0 fills the window edge to edge, and a wide window
+    // needs 600 and up to pull the card back to a comfortable reading width.
     magazineInset: number
     // Empty means "follow the theme": the card stays transparent and only turns
     // white on hover, exactly as the static sheet does. Otherwise #rrggbb.
@@ -85,12 +85,13 @@ export const LAYOUT_RANGES: Record<
     cardSnippetSize: { min: 10, max: 20, step: 1 },
     cardGap: { min: 4, max: 28, step: 2 },
     cardsColumnWidth: { min: 220, max: 420, step: 10 },
-    cardsRowHeight: { min: 260, max: 420, step: 10 },
     listCoverHeight: { min: 48, max: 140, step: 4 },
     listTitleSize: { min: 12, max: 22, step: 1 },
     listSnippetLines: { min: 1, max: 5, step: 1 },
     magazineCoverHeight: { min: 100, max: 280, step: 10 },
-    magazineInset: { min: 0, max: 200, step: 4 },
+    // Wide enough to pull the card back to ~700px on a very wide window (a
+    // 1900px window needs 600 per side).
+    magazineInset: { min: 0, max: 800, step: 10 },
     compactRowHeight: { min: 24, max: 56, step: 2 },
     compactSnippetLines: { min: 1, max: 3, step: 1 },
     waterfallMinColumnWidth: { min: 140, max: 320, step: 10 },
@@ -103,9 +104,9 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
     cardSnippetSize: 14,
     cardFont: "",
     cardGap: 12,
-    // 256 + 2 × 12 gutters = the historical 280px grid cell.
+    // 256 + 2 × 12 gutters = the historical 280px grid cell; its 304px height
+    // comes from CARDS_ROW_RATIO below.
     cardsColumnWidth: 256,
-    cardsRowHeight: 304,
     listCoverHeight: 80,
     listTitleSize: 14,
     listSnippetLines: 2,
@@ -122,6 +123,15 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
 export const LAYOUT_NUMBER_KEYS = Object.keys(
     LAYOUT_RANGES
 ) as LayoutNumberKey[]
+
+// Cards keep one shape at every width, so the row height is derived instead of
+// being a second slider: the grid cell is 1.1875 times the card's width, which
+// is exactly the 304 / 256 the view shipped with.
+export const CARDS_ROW_RATIO = 304 / 256
+
+export function cardsCellHeight(cardWidth: number): number {
+    return Math.round(cardWidth * CARDS_ROW_RATIO)
+}
 
 // A family name travels into a CSS custom property, so anything that could
 // break out of the declaration (quotes, commas, braces, semicolons) is dropped:

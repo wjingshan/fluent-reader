@@ -2,9 +2,8 @@ import * as React from "react"
 import { useEffect, useState } from "react"
 import intl from "react-intl-universal"
 import { makeStyles, mergeClasses } from "@griffel/react"
-import { LayoutConfig, ViewType } from "../../../schema-types"
+import { cardsCellHeight, LayoutConfig, ViewType } from "../../../schema-types"
 import { cardFontStack } from "../../../scripts/layout"
-
 // The settings sheet covers the whole window, so adjusting a slider would
 // otherwise be blind: this draws the same geometry the feeds use (cell sizes,
 // gutters, type size, family) and scales the whole stage down only when it would
@@ -202,9 +201,10 @@ function cardsStage(config: LayoutConfig, classes: any, thumb: string): Stage {
     const gap = config.cardGap
     const rowGap = Math.round(gap * 1.5)
     const cardWidth = config.cardsColumnWidth
-    // The cell also holds the card's two gutters, exactly like the feed.
+    // The cell also holds the card's two gutters, exactly like the feed, and its
+    // height follows from the width so the cards keep their shape.
     const cellWidth = cardWidth + gap * 2
-    const cellHeight = config.cardsRowHeight
+    const cellHeight = cardsCellHeight(cardWidth)
     // 4px of the cell stays free, exactly like the original 304 / 264 + 2×18.
     const cardHeight = cellHeight - rowGap * 2 - 4
     // The real cover band is a fixed 144px regardless of card height.
@@ -376,9 +376,10 @@ function magazineStage(
 ): Stage {
     const cover = config.magazineCoverHeight
     const inset = config.magazineInset
-    // Same rule as the card: fill the window minus the inset on each side, never
-    // past the historical 700px.
-    const width = Math.max(160, Math.min(STAGE_WIDTH, 700) - inset * 2)
+    // Same rule as the card: the whole width minus the inset on each side. The
+    // stage stays as wide as the window it stands in for, so a narrowed card is
+    // shown centred with the blank actually around it.
+    const width = Math.max(120, STAGE_WIDTH - inset * 2)
     const textHeight =
         2 * (config.cardTitleSize + 11) +
         6 +
@@ -393,67 +394,79 @@ function magazineStage(
     const row = (index: number) => (
         <div
             key={index}
-            className={classes.rowCard}
             style={{
-                width: `${width}px`,
-                height: `${height}px`,
-                padding: "24px",
-                // "Follow the theme" reads as the white page the real view
-                // sits on; a chosen colour shows as-is.
-                backgroundColor: config.magazineBackground || "var(--white)",
-                fontFamily: cardFontStack(config.cardFont),
+                width: `${STAGE_WIDTH}px`,
+                display: "flex",
+                justifyContent: "center",
             }}>
             <div
-                className={classes.cover}
+                className={classes.rowCard}
                 style={{
-                    width: `${Math.round(cover * 1.25)}px`,
-                    height: `${cover}px`,
-                    marginRight: "25px",
+                    width: `${width}px`,
+                    height: `${height}px`,
+                    padding: "24px",
+                    // "Follow the theme" reads as the white page the real
+                    // view sits on; a chosen colour shows as-is.
+                    backgroundColor:
+                        config.magazineBackground || "var(--white)",
+                    fontFamily: cardFontStack(config.cardFont),
                 }}>
-                <Cover
-                    src={thumb}
-                    size={Math.max(14, cover * 0.3)}
-                    position={COVER_OFFSETS[index % 5]}
-                />
-            </div>
-            <div
-                style={{
-                    flexGrow: 1,
-                    minWidth: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                }}>
-                <div>
-                    <div
-                        className={classes.title}
-                        style={{
-                            fontSize: `${config.cardTitleSize + 2}px`,
-                            lineHeight: `calc(${config.cardTitleSize + 11}px)`,
-                            WebkitLineClamp: "2",
-                        }}>
-                        {text.title}
-                    </div>
-                    <div
-                        className={classes.snippet}
-                        style={{
-                            fontSize: `${config.cardSnippetSize}px`,
-                            lineHeight: `calc(${config.cardSnippetSize + 7}px)`,
-                            marginTop: "6px",
-                            WebkitLineClamp: "2",
-                        }}>
-                        {text.snippet}
-                    </div>
+                <div
+                    className={classes.cover}
+                    style={{
+                        width: `${Math.round(cover * 1.25)}px`,
+                        height: `${cover}px`,
+                        marginRight: "25px",
+                    }}>
+                    <Cover
+                        src={thumb}
+                        size={Math.max(14, cover * 0.3)}
+                        position={COVER_OFFSETS[index % 5]}
+                    />
                 </div>
-                <div className={classes.meta} style={{ fontSize: "11px" }}>
-                    {text.meta}
+                <div
+                    style={{
+                        flexGrow: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                    }}>
+                    <div>
+                        <div
+                            className={classes.title}
+                            style={{
+                                fontSize: `${config.cardTitleSize + 2}px`,
+                                lineHeight: `calc(${
+                                    config.cardTitleSize + 11
+                                }px)`,
+                                WebkitLineClamp: "2",
+                            }}>
+                            {text.title}
+                        </div>
+                        <div
+                            className={classes.snippet}
+                            style={{
+                                fontSize: `${config.cardSnippetSize}px`,
+                                lineHeight: `calc(${
+                                    config.cardSnippetSize + 7
+                                }px)`,
+                                marginTop: "6px",
+                                WebkitLineClamp: "2",
+                            }}>
+                            {text.snippet}
+                        </div>
+                    </div>
+                    <div className={classes.meta} style={{ fontSize: "11px" }}>
+                        {text.meta}
+                    </div>
                 </div>
             </div>
         </div>
     )
 
     return {
-        width,
+        width: STAGE_WIDTH,
         height: rows * height,
         content: (
             <div style={{ display: "flex", flexDirection: "column" }}>

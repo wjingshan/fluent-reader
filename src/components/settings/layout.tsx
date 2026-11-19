@@ -174,9 +174,8 @@ const GROUPS: LayoutGroupDef[] = [
                 labelKey: "layout.cardsCardWidth",
                 hintKey: "layout.cardsCardWidthHint",
             },
-            { key: "cardsRowHeight", labelKey: "layout.cardsRowHeight" },
         ],
-        keys: ["cardsColumnWidth", "cardsRowHeight"],
+        keys: ["cardsColumnWidth"],
     },
     {
         key: "list",
