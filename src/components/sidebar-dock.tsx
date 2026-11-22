@@ -3,11 +3,10 @@ import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react/lib/Icon"
 import { makeStyles, tokens } from "@fluentui/react-components"
 import { useAppDispatch } from "../scripts/reducer"
-import { openManager, toggleSettings } from "../scripts/models/app"
+import { openManager } from "../scripts/models/app"
 
-// Bottom-left entry points of the reading list: subscription manager + settings.
-// They used to live in the top nav; keeping them next to the feed list makes
-// them reachable without travelling to the title bar.
+// Bottom-left entry point of the reading list: the subscription manager only.
+// Settings stays in the top nav where it has always been.
 const useClasses = makeStyles({
     dock: {
         display: "flex",
@@ -56,14 +55,6 @@ const SidebarDock: React.FC = () => {
                 aria-label={intl.get("subs.title")}
                 onClick={() => dispatch(openManager())}>
                 <Icon iconName="List" />
-            </button>
-            <button
-                type="button"
-                className={classes.item}
-                title={intl.get("nav.settings")}
-                aria-label={intl.get("nav.settings")}
-                onClick={() => dispatch(toggleSettings())}>
-                <Icon iconName="Settings" />
             </button>
         </div>
     )
