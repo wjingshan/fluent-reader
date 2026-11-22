@@ -104,6 +104,12 @@ export class AppState {
         display: false,
         focusGid: null as number,
     }
+
+    // Last fetch error per source, keyed by sid. Written when a fetch fails and
+    // cleared as soon as that source fetches successfully. Runtime only: after a
+    // restart there are no known failures until the next fetch runs.
+    fetchErrors = {} as Record<number, string>
+
     logMenu = {
         display: false,
         notify: false,
@@ -243,6 +249,8 @@ export const TOGGLE_MANAGER = "TOGGLE_MANAGER"
 export const SAVE_SETTINGS = "SAVE_SETTINGS"
 export const FREE_MEMORY = "FREE_MEMORY"
 export const SET_LAYOUT_CONFIG = "SET_LAYOUT_CONFIG"
+export const SET_FETCH_ERROR = "SET_FETCH_ERROR"
+export const CLEAR_FETCH_ERROR = "CLEAR_FETCH_ERROR"
 
 interface ToggleSettingsAction {
     type: typeof TOGGLE_SETTINGS
@@ -265,11 +273,22 @@ interface SetLayoutConfigAction {
     type: typeof SET_LAYOUT_CONFIG
     config: LayoutConfig
 }
+interface SetFetchErrorAction {
+    type: typeof SET_FETCH_ERROR
+    sid: number
+    error: string
+}
+interface ClearFetchErrorAction {
+    type: typeof CLEAR_FETCH_ERROR
+    sid: number
+}
 export type SettingsActionTypes =
     | ToggleSettingsAction
     | ToggleManagerAction
     | SaveSettingsAction
     | FreeMemoryAction
+    | SetFetchErrorAction
+    | ClearFetchErrorAction
 
 export type LayoutActionTypes = SetLayoutConfigAction
 
@@ -418,6 +437,19 @@ export const toggleManager = (open = true, focusGid: number = null) => ({
     type: TOGGLE_MANAGER,
     open: open,
     focusGid: focusGid,
+})
+
+// Fetch health bookkeeping. A failure is recorded per source and cleared as
+// soon as the same source fetches successfully.
+export const setFetchError = (sid: number, error: string) => ({
+    type: SET_FETCH_ERROR,
+    sid: sid,
+    error: error,
+})
+
+export const clearFetchError = (sid: number) => ({
+    type: CLEAR_FETCH_ERROR,
+    sid: sid,
 })
 
 // Opens the manager page. When it is entered from the settings overlay, flush
@@ -694,6 +726,10 @@ export function appReducer(
                 case ActionStatus.Failure:
                     return {
                         ...state,
+                        fetchErrors: {
+                            ...state.fetchErrors,
+                            [action.errSource.sid]: String(action.err),
+                        },
                         logMenu: {
                             ...state.logMenu,
                             notify: !state.logMenu.display,
@@ -867,6 +903,21 @@ export function appReducer(
                 ...state,
                 layout: action.config,
             }
+        case SET_FETCH_ERROR:
+            if (state.fetchErrors[action.sid] === action.error) return state
+            return {
+                ...state,
+                fetchErrors: {
+                    ...state.fetchErrors,
+                    [action.sid]: action.error,
+                },
+            }
+        case CLEAR_FETCH_ERROR: {
+            if (!(action.sid in state.fetchErrors)) return state
+            const fetchErrors = { ...state.fetchErrors }
+            delete fetchErrors[action.sid]
+            return { ...state, fetchErrors }
+        }
         case TOGGLE_LOGS:
             return {
                 ...state,

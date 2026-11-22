@@ -21,6 +21,7 @@ import {
     importOPML,
     exportOPML,
     reorderSourceGroups,
+    createSourceGroup,
 } from "../../scripts/models/group"
 import { fetchItems } from "../../scripts/models/item"
 import {
@@ -28,12 +29,13 @@ import {
     deleteSourcesQuiet,
 } from "../../scripts/models/manager"
 import { urlTest } from "../../scripts/utils"
-import { closeManager } from "../../scripts/models/app"
+import { closeManager, openManager } from "../../scripts/models/app"
 import { useManagerStyles } from "./styles"
 import { ManagerRow, statusOf } from "./utils"
 import GroupTree from "./group-tree"
 import SourceTable, { ManagerSort } from "./source-table"
 import SourceInspector from "./source-inspector"
+import CommandPalette, { ManagerCommand } from "./command-palette"
 
 const TOAST_MS = 6000
 
@@ -48,6 +50,7 @@ const SubscriptionManager: React.FC = () => {
     const app = useAppSelector(state => state.app)
     const sources = useAppSelector(state => state.sources)
     const groups = useAppSelector(state => state.groups)
+    const fetchErrors = useAppSelector(state => state.app.fetchErrors)
     const [query, setQuery] = useState("")
     const [filterKey, setFilterKey] = useState("all")
     const [sort, setSort] = useState<ManagerSort>("updated")
@@ -60,6 +63,12 @@ const SubscriptionManager: React.FC = () => {
     const [pendingDelete, setPendingDelete] = useState<Set<number>>(
         () => new Set()
     )
+    const [bulkNewGroup, setBulkNewGroup] = useState(false)
+    const [bulkGroupName, setBulkGroupName] = useState("")
+    const [paletteOpen, setPaletteOpen] = useState(false)
+    const [treeCreateSignal, setTreeCreateSignal] = useState(0)
+    const searchRef = useRef<any>(null)
+    const addRef = useRef<any>(null)
     const [toast, setToast] = useState<ToastState>(null)
     const toastCommitRef = useRef<() => void>(null)
     const toastTimerRef = useRef<number>(null)
@@ -117,16 +126,46 @@ const SubscriptionManager: React.FC = () => {
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return
-            if (selected.size > 0) {
-                setSelected(new Set())
-                return
+            if (event.key === "Escape") {
+                if (paletteOpen) {
+                    setPaletteOpen(false)
+                    return
+                }
+                if (selected.size > 0) {
+                    setSelected(new Set())
+                    return
+                }
+                closeAll()
             }
-            closeAll()
         }
         window.addEventListener("keydown", onKeyDown)
         return () => window.removeEventListener("keydown", onKeyDown)
-    }, [closeAll, selected.size])
+    }, [closeAll, selected.size, paletteOpen])
+
+    // Global shortcuts: Ctrl/Cmd+Shift+M opens the manager from anywhere,
+    // Ctrl/Cmd+K opens the palette, Ctrl/Cmd+F jumps to the search box.
+    useEffect(() => {
+        const onShortcut = (event: KeyboardEvent) => {
+            const mod = event.ctrlKey || event.metaKey
+            if (!mod) return
+            const key = event.key.toLowerCase()
+            if (event.shiftKey && key === "m") {
+                event.preventDefault()
+                void dispatch(openManager())
+                return
+            }
+            if (!app.manager.display) return
+            if (key === "k") {
+                event.preventDefault()
+                setPaletteOpen(prev => !prev)
+            } else if (key === "f") {
+                event.preventDefault()
+                searchRef.current?.focus()
+            }
+        }
+        window.addEventListener("keydown", onShortcut)
+        return () => window.removeEventListener("keydown", onShortcut)
+    }, [dispatch, app.manager.display])
 
     const groupBySid = useMemo(() => {
         const map = new Map<number, typeof groups[number]>()
@@ -165,8 +204,13 @@ const SubscriptionManager: React.FC = () => {
         let list = visible
         if (filterKey === "ungrouped") {
             list = visible.filter(source => !groupBySid.has(source.sid))
+        } else if (filterKey === "failed") {
+            list = visible.filter(source => Boolean(fetchErrors[source.sid]))
         } else if (filterKey === "stale") {
-            list = visible.filter(source => statusOf(source) === "stale")
+            list = visible.filter(
+                source =>
+                    statusOf(source, fetchErrors[source.sid]) === "stale"
+            )
         } else if (filterKey === "never") {
             list = visible.filter(source => !source.lastFetched)
         } else if (filterKey === "hidden") {
@@ -205,7 +249,7 @@ const SubscriptionManager: React.FC = () => {
             return updatedAt(b) - updatedAt(a)
         })
         return result
-    }, [allSources, filterKey, groupBySid, query, sort])
+    }, [allSources, filterKey, groupBySid, query, sort, fetchErrors])
 
     // While a selection is active, freeze the row order: background fetches
     // keep updating lastFetched, and re-sorting mid-selection would move
@@ -244,13 +288,24 @@ const SubscriptionManager: React.FC = () => {
             all: visible.length,
             ungrouped: visible.filter(source => !groupBySid.has(source.sid))
                 .length,
-            stale: visible.filter(source => statusOf(source) === "stale")
-                .length,
+            stale: visible.filter(
+                source =>
+                    statusOf(source, fetchErrors[source.sid]) === "stale"
+            ).length,
             never: visible.filter(source => !source.lastFetched).length,
+            failed: visible.filter(source => Boolean(fetchErrors[source.sid]))
+                .length,
             hidden: allSources.length - visible.length,
             byGid,
         }
-    }, [allSources, groupBySid, multiGroups, sources, pendingDelete])
+    }, [
+        allSources,
+        groupBySid,
+        multiGroups,
+        sources,
+        pendingDelete,
+        fetchErrors,
+    ])
 
     useEffect(() => {
         if (!rows.some(row => row.source.sid === currentSid)) {
@@ -258,10 +313,95 @@ const SubscriptionManager: React.FC = () => {
         }
     }, [rows, currentSid])
 
+    const commands = useMemo<ManagerCommand[]>(() => {
+        const list: ManagerCommand[] = [
+            {
+                id: "search",
+                label: intl.get("subs.cmdSearch"),
+                keys: "Ctrl+F",
+                run: () => searchRef.current?.focus(),
+            },
+            {
+                id: "add",
+                label: intl.get("subs.cmdAdd"),
+                run: () => addRef.current?.focus(),
+            },
+            {
+                id: "import",
+                label: intl.get("subs.cmdImport"),
+                run: () => void dispatch(importOPML()),
+            },
+            {
+                id: "export",
+                label: intl.get("subs.cmdExport"),
+                run: () => void dispatch(exportOPML()),
+            },
+            {
+                id: "refreshAll",
+                label: intl.get("subs.cmdRefreshAll"),
+                run: () => dispatch(fetchItems(false, null)),
+            },
+            {
+                id: "filterAll",
+                label: intl.get("subs.cmdFilterAll"),
+                run: () => setFilterKey("all"),
+            },
+            {
+                id: "filterUngrouped",
+                label: intl.get("subs.cmdFilterUngrouped"),
+                run: () => setFilterKey("ungrouped"),
+            },
+            {
+                id: "filterFailed",
+                label: intl.get("subs.cmdFilterFailed"),
+                run: () => setFilterKey("failed"),
+            },
+            {
+                id: "filterStale",
+                label: intl.get("subs.cmdFilterStale"),
+                run: () => setFilterKey("stale"),
+            },
+            {
+                id: "filterHidden",
+                label: intl.get("subs.cmdFilterHidden"),
+                run: () => setFilterKey("hidden"),
+            },
+            {
+                id: "newGroup",
+                label: intl.get("subs.cmdNewGroup"),
+                run: () => setTreeCreateSignal(prev => prev + 1),
+            },
+            {
+                id: "close",
+                label: intl.get("subs.cmdClose"),
+                keys: "Esc",
+                run: closeAll,
+            },
+        ]
+        if (selected.size > 0) {
+            list.splice(5, 0, {
+                id: "refreshSelected",
+                label: intl.get("subs.cmdRefreshSelected"),
+                hint: intl.get("subs.selectedCount", { count: selected.size }),
+                run: () => dispatch(fetchItems(true, [...selected])),
+            })
+        }
+        multiGroups.forEach(group => {
+            list.push({
+                id: `g${group.gid}`,
+                label: `${intl.get("subs.cmdGroupPrefix")}：${group.name}`,
+                hint: String(group.sids.length),
+                run: () => setFilterKey(`g:${group.gid}`),
+            })
+        })
+        return list
+    }, [selected, multiGroups, dispatch, closeAll])
+
     if (!app.manager.display) return null
 
     const selectedSource = currentSid != null ? sources[currentSid] : null
     const staleCount = counts.stale
+    const failedCount = counts.failed
 
     const submitAdd = async () => {
         const url = addUrl.trim()
@@ -318,13 +458,19 @@ const SubscriptionManager: React.FC = () => {
 
     /* ---------- bulk actions ---------- */
 
-    const moveSelected = (sids: number[], gid: number | null) => {
+    const moveSelected = (
+        sids: number[],
+        gid: number | null,
+        knownName?: string
+    ) => {
         const snapshot = dispatch(moveSourcesToGroup(sids, gid))
         if (!snapshot) return
+        // A group created moments ago is not in this render's closure yet, so
+        // callers may pass the name they just typed.
         const targetName =
             gid === null
                 ? null
-                : multiGroups.find(g => g.gid === gid)?.name || ""
+                : knownName ?? (groups.find(g => g.gid === gid)?.name || "")
         showToast(
             gid === null
                 ? intl.get("subs.movedUngroupedToast", { count: sids.length })
@@ -347,6 +493,16 @@ const SubscriptionManager: React.FC = () => {
 
     const bulkRefresh = () => {
         dispatch(fetchItems(true, [...selected]))
+    }
+
+    // Create a group on the fly and move the current selection into it.
+    const createGroupAndMove = () => {
+        const name = bulkGroupName.trim()
+        if (!name || selected.size === 0) return
+        const gid = dispatch(createSourceGroup(name))
+        setBulkNewGroup(false)
+        setBulkGroupName("")
+        if (gid != null) moveSelected([...selected], gid, name)
     }
 
     const bulkDelete = () => {
@@ -414,17 +570,26 @@ const SubscriptionManager: React.FC = () => {
                         })}
                         {staleCount > 0 &&
                             intl.get("subs.staleStat", { count: staleCount })}
+                        {failedCount > 0 &&
+                            intl.get("subs.failedStat", { count: failedCount })}
                     </div>
                 </div>
                 <div className={classes.headerActions}>
                     {app.fetchingItems && <Spinner size="tiny" />}
                     <Input
+                        ref={searchRef}
                         className={classes.search}
                         size="small"
                         value={query}
                         placeholder={intl.get("subs.search")}
                         contentBefore={<Icon iconName="Search" />}
                         onChange={(_, data) => setQuery(data.value)}
+                    />
+                    <Button
+                        appearance="subtle"
+                        icon={<Icon iconName="CommandPrompt" />}
+                        title={intl.get("subs.shortcutHint")}
+                        onClick={() => setPaletteOpen(true)}
                     />
                     <Button
                         appearance="subtle"
@@ -448,6 +613,7 @@ const SubscriptionManager: React.FC = () => {
             </div>
             <div className={classes.addBar}>
                 <Input
+                    ref={addRef}
                     className={classes.addInput}
                     value={addUrl}
                     placeholder={intl.get("subs.addPlaceholder")}
@@ -472,6 +638,7 @@ const SubscriptionManager: React.FC = () => {
                     counts={counts}
                     selectedSid={currentSid}
                     dragSids={dragSids}
+                    createSignal={treeCreateSignal}
                     onFilter={setFilterKey}
                     onSelectSource={setCurrentSid}
                     onMoveSources={onMoveSources}
@@ -485,6 +652,7 @@ const SubscriptionManager: React.FC = () => {
                         currentSid={currentSid}
                         selected={selected}
                         dragging={dragSids != null}
+                        fetchErrors={fetchErrors}
                         onFilter={setFilterKey}
                         onSort={setSort}
                         onSelect={setCurrentSid}
@@ -500,34 +668,82 @@ const SubscriptionManager: React.FC = () => {
                                     count: selected.size,
                                 })}
                             </span>
-                            <Dropdown
-                                size="small"
-                                className={classes.bulkMoveDropdown}
-                                value={intl.get("subs.moveTo")}
-                                selectedOptions={[]}
-                                onOptionSelect={(_, data) => {
-                                    if (!data.optionValue) return
-                                    moveSelected(
-                                        [...selected],
-                                        data.optionValue === "ungrouped"
-                                            ? null
-                                            : parseInt(data.optionValue)
-                                    )
-                                }}>
-                                <Option
-                                    value="ungrouped"
-                                    text={intl.get("subs.ungrouped")}>
-                                    {intl.get("subs.ungrouped")}
-                                </Option>
-                                {multiGroups.map(group => (
+                            {bulkNewGroup ? (
+                                <>
+                                    <Input
+                                        className={classes.bulkMoveDropdown}
+                                        size="small"
+                                        autoFocus
+                                        value={bulkGroupName}
+                                        placeholder={intl.get("subs.groupName")}
+                                        onChange={(_, data) =>
+                                            setBulkGroupName(data.value)
+                                        }
+                                        onKeyDown={event => {
+                                            if (event.key === "Enter")
+                                                createGroupAndMove()
+                                            if (event.key === "Escape") {
+                                                setBulkNewGroup(false)
+                                                setBulkGroupName("")
+                                            }
+                                        }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        appearance="primary"
+                                        disabled={!bulkGroupName.trim()}
+                                        onClick={createGroupAndMove}>
+                                        {intl.get("subs.newGroupAndMove")}
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        appearance="subtle"
+                                        onClick={() => {
+                                            setBulkNewGroup(false)
+                                            setBulkGroupName("")
+                                        }}>
+                                        {intl.get("subs.cancel")}
+                                    </Button>
+                                </>
+                            ) : (
+                                <Dropdown
+                                    size="small"
+                                    className={classes.bulkMoveDropdown}
+                                    value={intl.get("subs.moveTo")}
+                                    selectedOptions={[]}
+                                    onOptionSelect={(_, data) => {
+                                        if (!data.optionValue) return
+                                        if (data.optionValue === "__new__") {
+                                            setBulkNewGroup(true)
+                                            return
+                                        }
+                                        moveSelected(
+                                            [...selected],
+                                            data.optionValue === "ungrouped"
+                                                ? null
+                                                : parseInt(data.optionValue)
+                                        )
+                                    }}>
                                     <Option
-                                        key={group.gid}
-                                        value={String(group.gid)}
-                                        text={group.name}>
-                                        {group.name}
+                                        value="ungrouped"
+                                        text={intl.get("subs.ungrouped")}>
+                                        {intl.get("subs.ungrouped")}
                                     </Option>
-                                ))}
-                            </Dropdown>
+                                    {multiGroups.map(group => (
+                                        <Option
+                                            key={group.gid}
+                                            value={String(group.gid)}
+                                            text={group.name}>
+                                            {group.name}
+                                        </Option>
+                                    ))}
+                                    <Option
+                                        value="__new__"
+                                        text={intl.get("subs.newGroupHere")}>
+                                        {intl.get("subs.newGroupHere")}
+                                    </Option>
+                                </Dropdown>
+                            )}
                             {selectedHiddenVisible ? (
                                 <Button
                                     size="small"
@@ -574,6 +790,7 @@ const SubscriptionManager: React.FC = () => {
                     <SourceInspector
                         source={selectedSource}
                         groups={groups}
+                        error={fetchErrors[selectedSource.sid]}
                         onDeleted={() => setCurrentSid(null)}
                     />
                 ) : (
@@ -589,6 +806,12 @@ const SubscriptionManager: React.FC = () => {
                     </div>
                 )}
             </div>
+            {paletteOpen && (
+                <CommandPalette
+                    commands={commands}
+                    onClose={() => setPaletteOpen(false)}
+                />
+            )}
             {toast && (
                 <div className={classes.toast}>
                     <span>{toast.message}</span>

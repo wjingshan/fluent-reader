@@ -31,6 +31,7 @@ import { groupColor } from "./group-tree"
 export interface SourceInspectorProps {
     source: RSSSource
     groups: SourceGroup[]
+    error?: string
     onDeleted: () => void
 }
 
@@ -63,6 +64,7 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
     const classes = useManagerStyles()
     const [name, setName] = useState(source.name || "")
     const [feedUrl, setFeedUrl] = useState(source.url || "")
+    const [retrying, setRetrying] = useState(false)
 
     useEffect(() => {
         setName(source.name || "")
@@ -70,7 +72,18 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
     }, [source.sid])
 
     const group = groupOf(groups, source.sid)
-    const status = statusOf(source)
+    const error = props.error
+    const status = statusOf(source, error)
+
+    const retry = async () => {
+        if (retrying) return
+        setRetrying(true)
+        try {
+            await dispatch(fetchItems(false, [source.sid]))
+        } finally {
+            setRetrying(false)
+        }
+    }
 
     const commitName = () => {
         const next = name.trim()
@@ -169,12 +182,39 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                 <Button
                     appearance="subtle"
                     size="small"
-                    title={intl.get("subs.refresh")}
+                    title={error ? intl.get("subs.retry") : intl.get("subs.refresh")}
                     icon={<Icon iconName="Refresh" />}
-                    onClick={() => dispatch(fetchItems(false, [source.sid]))}
+                    disabled={retrying}
+                    onClick={() => void retry()}
                 />
             </div>
             <div className={classes.inspectorScroll}>
+                {error && (
+                    <div className={classes.section}>
+                        <div className={classes.errorBox}>
+                            <div className={classes.errorTitle}>
+                                <Icon iconName="ErrorBadge" />
+                                {intl.get("subs.errorTitle")}
+                            </div>
+                            <div className={classes.errorText}>{error}</div>
+                            <div className={classes.errorText}>
+                                {intl.get("subs.errorHint")}
+                            </div>
+                            <div className={classes.errorActions}>
+                                <Button
+                                    size="small"
+                                    appearance="primary"
+                                    icon={<Icon iconName="Refresh" />}
+                                    disabled={retrying}
+                                    onClick={() => void retry()}>
+                                    {retrying
+                                        ? intl.get("subs.retrying")
+                                        : intl.get("subs.retry")}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {source.serviceRef && (
                     <div className={classes.section}>
                         <div className={classes.notice}>
@@ -189,6 +229,7 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                             className={mergeClasses(
                                 classes.status,
                                 status === "stale" && classes.statusStale,
+                                status === "error" && classes.statusError,
                                 status === "hidden" && classes.statusHidden
                             )}>
                             <span
@@ -196,6 +237,8 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                                     classes.statusDot,
                                     status === "stale" &&
                                         classes.statusStaleDot,
+                                    status === "error" &&
+                                        classes.statusErrorDot,
                                     status === "hidden" &&
                                         classes.statusHiddenDot
                                 )}

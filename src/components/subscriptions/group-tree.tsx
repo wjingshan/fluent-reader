@@ -1,11 +1,12 @@
 import * as React from "react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react/lib/Icon"
 import { Button, Input, mergeClasses } from "@fluentui/react-components"
 import { useAppDispatch } from "../../scripts/reducer"
 import {
     createSourceGroup,
+    reorderSourceGroups,
     updateSourceGroup,
 } from "../../scripts/models/group"
 import { deleteSourceGroupQuiet } from "../../scripts/models/manager"
@@ -20,6 +21,8 @@ export interface GroupTreeProps {
     counts: { all: number; ungrouped: number; byGid: Record<number, number> }
     selectedSid: number | null
     dragSids: number[] | null
+    // Bumped from the command palette to open the inline "new group" input.
+    createSignal?: number
     onFilter: (key: string) => void
     onSelectSource: (sid: number) => void
     onMoveSources: (sids: number[], gid: number | null) => void
@@ -39,6 +42,10 @@ const GROUP_COLORS = [
 export const groupColor = (gid: number) =>
     GROUP_COLORS[Math.abs(gid) % GROUP_COLORS.length]
 
+// Group reordering uses its own drag type so a group node is never mistaken for
+// a source being dropped into a group.
+const GROUP_DRAG_TYPE = "application/x-fr-group"
+
 const GroupTree: React.FC<GroupTreeProps> = props => {
     const { groups, sources, filterKey, counts, selectedSid, dragSids } = props
     const dispatch = useAppDispatch()
@@ -49,9 +56,39 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
     const [creating, setCreating] = useState(false)
     const [newName, setNewName] = useState("")
     const [dropKey, setDropKey] = useState<string>(null)
+    const [dragGid, setDragGid] = useState<number>(null)
+    const [insertMark, setInsertMark] = useState<{
+        gid: number
+        before: boolean
+    }>(null)
+
+    // Command palette "new group" opens the inline composer below the tree.
+    useEffect(() => {
+        if (props.createSignal) setCreating(true)
+    }, [props.createSignal])
 
     const dropProps = (key: string, gid: number | null) => ({
         onDragOver: (event: React.DragEvent) => {
+            // A group being reordered hovers as an insertion line; the root
+            // entries (All / Ungrouped) are not valid reorder targets.
+            if (event.dataTransfer.types.includes(GROUP_DRAG_TYPE)) {
+                if (gid == null || dragGid === gid) {
+                    setInsertMark(prev =>
+                        prev && prev.gid !== gid ? prev : null
+                    )
+                    return
+                }
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+                const rect = event.currentTarget.getBoundingClientRect()
+                setInsertMark({
+                    gid,
+                    before: event.clientY < rect.top + rect.height / 2,
+                })
+                return
+            }
+            // A group being reordered must not light up as a drop target for
+            // sources.
             const hasPayload =
                 dragSids || event.dataTransfer.types.includes("text/plain")
             if (!hasPayload) return
@@ -65,6 +102,21 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
         onDrop: (event: React.DragEvent) => {
             event.preventDefault()
             setDropKey(null)
+            if (event.dataTransfer.types.includes(GROUP_DRAG_TYPE)) {
+                if (gid == null) return
+                event.stopPropagation()
+                const fromGid =
+                    dragGid ??
+                    parseInt(event.dataTransfer.getData(GROUP_DRAG_TYPE))
+                const before =
+                    insertMark?.gid === gid ? insertMark.before : true
+                setDragGid(null)
+                setInsertMark(null)
+                if (Number.isFinite(fromGid)) {
+                    applyReorder(fromGid, gid, before)
+                }
+                return
+            }
             let sids = dragSids
             if (!sids) {
                 try {
@@ -86,6 +138,40 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
         () => groups.filter(g => g.isMultiple),
         [groups]
     )
+
+    // Moves one group before/after another, keeping single-source placeholder
+    // groups at their original slots so the persisted order stays complete.
+    const applyReorder = (fromGid: number, toGid: number, before: boolean) => {
+        if (fromGid === toGid) return
+        const list = groups.filter(g => g.isMultiple)
+        const moved = list.find(g => g.gid === fromGid)
+        if (!moved) return
+        const rest = list.filter(g => g.gid !== fromGid)
+        let index = rest.findIndex(g => g.gid === toGid)
+        if (index < 0) return
+        if (!before) index += 1
+        rest.splice(index, 0, moved)
+        let cursor = 0
+        const next = groups.map(group =>
+            group.isMultiple ? rest[cursor++] : group
+        )
+        dispatch(reorderSourceGroups(next))
+    }
+
+    // Only the grab/drag lifecycle lives here; the hover and drop handling is
+    // merged into dropProps so a node can serve both source drops and reorders.
+    const groupDragProps = (group: SourceGroup) => ({
+        draggable: editingGid !== group.gid,
+        onDragStart: (event: React.DragEvent) => {
+            setDragGid(group.gid)
+            event.dataTransfer.effectAllowed = "move"
+            event.dataTransfer.setData(GROUP_DRAG_TYPE, String(group.gid))
+        },
+        onDragEnd: () => {
+            setDragGid(null)
+            setInsertMark(null)
+        },
+    })
 
     const toggleExpand = (gid: number) => {
         setExpanded(prev => {
@@ -181,9 +267,17 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                                     classes.treeItem,
                                     active && classes.treeItemActive,
                                     dropKey === `g:${group.gid}` &&
-                                        classes.treeDropTarget
+                                        classes.treeDropTarget,
+                                    dragGid === group.gid &&
+                                        classes.treeGroupDragging,
+                                    insertMark?.gid === group.gid &&
+                                        (insertMark.before
+                                            ? classes.treeInsertBefore
+                                            : classes.treeInsertAfter)
                                 )}
                                 onClick={() => props.onFilter(`g:${group.gid}`)}
+                                title={intl.get("subs.dragGroupHint")}
+                                {...groupDragProps(group)}
                                 {...dropProps(`g:${group.gid}`, group.gid)}>
                                 <Icon
                                     iconName="ChevronRight"

@@ -407,6 +407,12 @@ export const useManagerStyles = makeStyles({
     statusStaleDot: {
         backgroundColor: tokens.colorStatusWarningForeground1,
     },
+    statusError: {
+        color: tokens.colorStatusDangerForeground1,
+    },
+    statusErrorDot: {
+        backgroundColor: tokens.colorStatusDangerForeground1,
+    },
     statusHidden: {
         color: tokens.colorNeutralForeground3,
     },
@@ -669,8 +675,8 @@ export const useManagerStyles = makeStyles({
     /* ---------- health cards ---------- */
     healthCards: {
         display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gap: "10px",
+        gridTemplateColumns: "repeat(5, 1fr)",
+        gap: "8px",
         padding: "12px 14px 2px",
         flexShrink: 0,
     },
@@ -705,5 +711,152 @@ export const useManagerStyles = makeStyles({
     healthLabel: {
         fontSize: tokens.fontSizeBase100,
         color: tokens.colorNeutralForeground3,
+    },
+
+    /* ---------- fetch failure ---------- */
+    chipDangerCount: {
+        color: tokens.colorStatusDangerForeground1,
+        fontWeight: tokens.fontWeightSemibold,
+    },
+    healthValueDanger: {
+        color: tokens.colorStatusDangerForeground1,
+    },
+
+    /* ---------- group reordering ---------- */
+    treeGroupDragging: {
+        opacity: 0.45,
+    },
+    treeInsertBefore: {
+        boxShadow: `inset 0 2px 0 0 ${tokens.colorBrandStroke1}`,
+    },
+    treeInsertAfter: {
+        boxShadow: `inset 0 -2px 0 0 ${tokens.colorBrandStroke1}`,
+    },
+    treeGrip: {
+        opacity: 0.4,
+        cursor: "grab",
+        fontSize: "10px",
+        color: tokens.colorNeutralForeground3,
+        flexShrink: 0,
+    },
+
+    /* ---------- inspector error ---------- */
+    errorBox: {
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+        padding: "10px 12px",
+        borderRadius: "8px",
+        border: `1px solid ${tokens.colorStatusDangerBorder1}`,
+        backgroundColor: tokens.colorStatusDangerBackground1,
+        color: tokens.colorStatusDangerForeground1,
+        fontSize: tokens.fontSizeBase200,
+        overflowWrap: "anywhere",
+    },
+    errorTitle: {
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        fontWeight: tokens.fontWeightSemibold,
+        fontSize: tokens.fontSizeBase200,
+    },
+    errorText: {
+        color: tokens.colorNeutralForeground2,
+        fontFamily: "Consolas, monospace",
+        fontSize: tokens.fontSizeBase100,
+        maxHeight: "96px",
+        overflow: "auto",
+        whiteSpace: "pre-wrap",
+    },
+    errorActions: {
+        display: "flex",
+        gap: "8px",
+    },
+
+    /* ---------- command palette ---------- */
+    paletteBackdrop: {
+        position: "absolute",
+        top: "0",
+        left: "0",
+        right: "0",
+        bottom: "0",
+        zIndex: 8,
+        backgroundColor: "rgba(0,0,0,0.28)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-start",
+        paddingTop: "12vh",
+    },
+    palette: {
+        width: "560px",
+        maxWidth: "calc(100vw - 48px)",
+        borderRadius: "10px",
+        backgroundColor: tokens.colorNeutralBackground1,
+        boxShadow: tokens.shadow28,
+        border: `1px solid ${tokens.colorNeutralStroke1}`,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+    },
+    paletteInput: {
+        border: "none",
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+        padding: "12px 14px",
+        fontSize: tokens.fontSizeBase300,
+        fontFamily: "inherit",
+        outline: "none",
+        color: tokens.colorNeutralForeground1,
+        backgroundColor: tokens.colorNeutralBackground1,
+    },
+    paletteList: {
+        maxHeight: "320px",
+        overflowY: "auto",
+        padding: "6px",
+        display: "flex",
+        flexDirection: "column",
+    },
+    paletteItem: {
+        "display": "flex",
+        "alignItems": "center",
+        "gap": "10px",
+        "padding": "8px 10px",
+        "borderRadius": "6px",
+        "border": "none",
+        "background": "none",
+        "cursor": "pointer",
+        "textAlign": "left",
+        "fontFamily": "inherit",
+        "fontSize": tokens.fontSizeBase200,
+        "color": tokens.colorNeutralForeground1,
+        ":hover": {
+            backgroundColor: tokens.colorNeutralBackground1Hover,
+        },
+    },
+    paletteItemActive: {
+        backgroundColor: tokens.colorBrandBackground2,
+        color: tokens.colorBrandForeground1,
+    },
+    paletteFoot: {
+        padding: "6px 12px 8px",
+        fontSize: tokens.fontSizeBase100,
+        color: tokens.colorNeutralForeground3,
+        borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    },
+    paletteHint: {
+        flex: "1 1 auto",
+        color: tokens.colorNeutralForeground3,
+        fontSize: tokens.fontSizeBase100,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+    },
+    paletteKey: {
+        fontSize: tokens.fontSizeBase100,
+        padding: "1px 6px",
+        borderRadius: "4px",
+        border: `1px solid ${tokens.colorNeutralStroke1}`,
+        color: tokens.colorNeutralForeground3,
+        backgroundColor: tokens.colorNeutralBackground2,
+        fontFamily: "Consolas, monospace",
     },
 })

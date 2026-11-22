@@ -5,8 +5,6 @@ import { Icon } from "@fluentui/react/lib/Icon"
 import { AnimationClassNames } from "@fluentui/react/lib/Styling"
 import AboutTab from "./settings/about"
 import { Pivot, PivotItem, FocusTrapZone } from "@fluentui/react"
-import SourcesTabContainer from "../containers/settings/sources-container"
-import GroupsTab from "./settings/groups"
 import AppTabContainer from "../containers/settings/app-container"
 import RulesTab from "./settings/rules"
 import ServiceTabContainer from "../containers/settings/service-container"
@@ -106,14 +104,22 @@ const Settings: React.FC = () => {
                     )}
                     <Pivot className={settingsClasses.pivot}>
                         <PivotItem
-                            headerText={intl.get("settings.sources")}
-                            itemIcon="Source">
-                            <SourcesTabContainer />
-                        </PivotItem>
-                        <PivotItem
-                            headerText={intl.get("settings.grouping")}
-                            itemIcon="GroupList">
-                            <GroupsTab />
+                            headerText={intl.get("subs.settingsTab")}
+                            itemIcon="List">
+                            <div className={settingsClasses.managerTab}>
+                                <div className={settingsClasses.managerTitle}>
+                                    {intl.get("subs.title")}
+                                </div>
+                                <div className={settingsClasses.managerIntro}>
+                                    {intl.get("subs.settingsIntro")}
+                                </div>
+                                <Button
+                                    appearance="primary"
+                                    icon={<Icon iconName="List" />}
+                                    onClick={() => dispatch(openManager())}>
+                                    {intl.get("subs.settingsOpen")}
+                                </Button>
+                            </div>
                         </PivotItem>
                         <PivotItem
                             headerText={intl.get("settings.rules")}
@@ -139,24 +145,6 @@ const Settings: React.FC = () => {
                             headerText={intl.get("settings.about")}
                             itemIcon="Info">
                             <AboutTab />
-                        </PivotItem>
-                        <PivotItem
-                            headerText={intl.get("subs.settingsTab")}
-                            itemIcon="List">
-                            <div className={settingsClasses.managerTab}>
-                                <div className={settingsClasses.managerTitle}>
-                                    {intl.get("subs.title")}
-                                </div>
-                                <div className={settingsClasses.managerIntro}>
-                                    {intl.get("subs.settingsIntro")}
-                                </div>
-                                <Button
-                                    appearance="primary"
-                                    icon={<Icon iconName="List" />}
-                                    onClick={() => dispatch(openManager())}>
-                                    {intl.get("subs.settingsOpen")}
-                                </Button>
-                            </div>
                         </PivotItem>
                     </Pivot>
                 </div>

@@ -21,6 +21,8 @@ import {
     FREE_MEMORY,
     setLastMarkAll,
     clearLastMarkAll,
+    setFetchError,
+    clearFetchError,
 } from "./app"
 import {
     getServiceHooks,
@@ -370,6 +372,12 @@ export function fetchItems(
                     else {
                         console.log(r.reason)
                         dispatch(fetchItemsFailure(sources[i], r.reason))
+                        dispatch(
+                            setFetchError(
+                                sources[i].sid,
+                                String(r.reason ?? "")
+                            )
+                        )
                     }
                 })
                 insertItems(items)
@@ -388,6 +396,7 @@ export function fetchItems(
                                             })
                                         )
                                     )
+                                    dispatch(clearFetchError(sources[i].sid))
                                 }
                             }
                         }

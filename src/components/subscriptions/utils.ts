@@ -7,12 +7,15 @@ export interface ManagerRow {
     group: SourceGroup | null
 }
 
-export type SourceStatus = "ok" | "stale" | "hidden"
+export type SourceStatus = "ok" | "stale" | "hidden" | "error"
 
 export const STALE_MINUTES = 30 * 24 * 60
 
-export function statusOf(source: RSSSource): SourceStatus {
+// A recorded fetch failure outranks staleness: the source is reachable but
+// broken, which needs a different fix than "has not updated in a while".
+export function statusOf(source: RSSSource, error?: string): SourceStatus {
     if (source.hidden) return "hidden"
+    if (error) return "error"
     const time = source.lastFetched ? new Date(source.lastFetched).getTime() : 0
     if (!time || time <= 0) return "stale"
     if (Date.now() - time > STALE_MINUTES * 60000) return "stale"
@@ -23,6 +26,8 @@ export function statusLabel(status: SourceStatus) {
     switch (status) {
         case "hidden":
             return intl.get("subs.statusHidden")
+        case "error":
+            return intl.get("subs.statusError")
         case "stale":
             return intl.get("subs.statusStale")
         default:

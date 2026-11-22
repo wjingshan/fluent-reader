@@ -28,7 +28,9 @@ export interface SourceTableProps {
         stale: number
         hidden: number
         never: number
+        failed: number
     }
+    fetchErrors: Record<number, string>
     currentSid: number | null
     selected: Set<number>
     dragging: boolean
@@ -44,6 +46,7 @@ export interface SourceTableProps {
 const SourceTable: React.FC<SourceTableProps> = props => {
     const { rows, filterKey, sort, counts, currentSid, selected } = props
     const classes = useManagerStyles()
+    const errors = props.fetchErrors
 
     const chips: {
         key: string
@@ -56,6 +59,12 @@ const SourceTable: React.FC<SourceTableProps> = props => {
             key: "ungrouped",
             label: intl.get("subs.ungrouped"),
             count: counts.ungrouped,
+        },
+        {
+            key: "failed",
+            label: intl.get("subs.failed"),
+            count: counts.failed,
+            danger: true,
         },
         { key: "stale", label: intl.get("subs.stale"), count: counts.stale },
         { key: "hidden", label: intl.get("subs.hidden"), count: counts.hidden },
@@ -71,9 +80,16 @@ const SourceTable: React.FC<SourceTableProps> = props => {
         rows.length > 0 && rows.every(row => selected.has(row.source.sid))
     const someChecked = rows.some(row => selected.has(row.source.sid))
 
-    const showHealth = filterKey === "stale" || filterKey === "never"
+    const showHealth =
+        filterKey === "stale" || filterKey === "never" || filterKey === "failed"
     const healthCards = [
         { key: "all", label: intl.get("subs.all"), value: counts.all },
+        {
+            key: "failed",
+            label: intl.get("subs.failed"),
+            value: counts.failed,
+            danger: true,
+        },
         {
             key: "stale",
             label: intl.get("subs.stale"),
@@ -101,7 +117,15 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                         )}
                         onClick={() => props.onFilter(chip.key)}>
                         {chip.label}
-                        <span className={classes.chipCount}>{chip.count}</span>
+                        <span
+                            className={mergeClasses(
+                                classes.chipCount,
+                                chip.danger &&
+                                    chip.count > 0 &&
+                                    classes.chipDangerCount
+                            )}>
+                            {chip.count}
+                        </span>
                     </button>
                 ))}
                 <div className={classes.sortWrap}>
@@ -146,7 +170,10 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                                     classes.healthValue,
                                     card.warn &&
                                         card.value > 0 &&
-                                        classes.healthValueWarn
+                                        classes.healthValueWarn,
+                                    card.danger &&
+                                        card.value > 0 &&
+                                        classes.healthValueDanger
                                 )}>
                                 {card.value}
                             </span>
@@ -209,7 +236,8 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                 ) : (
                     rows.map(row => {
                         const source = row.source
-                        const status = statusOf(source)
+                        const error = errors[source.sid]
+                        const status = statusOf(source, error)
                         const unread = source.unreadCount || 0
                         const isChecked = selected.has(source.sid)
                         return (
@@ -313,14 +341,19 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                                         classes.status,
                                         status === "stale" &&
                                             classes.statusStale,
+                                        status === "error" &&
+                                            classes.statusError,
                                         status === "hidden" &&
                                             classes.statusHidden
-                                    )}>
+                                    )}
+                                    title={error || undefined}>
                                     <span
                                         className={mergeClasses(
                                             classes.statusDot,
                                             status === "stale" &&
                                                 classes.statusStaleDot,
+                                            status === "error" &&
+                                                classes.statusErrorDot,
                                             status === "hidden" &&
                                                 classes.statusHiddenDot
                                         )}
