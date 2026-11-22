@@ -428,9 +428,6 @@
         "cmdOpenSettings": "打开设置",
         "cmdGroupPrefix": "跳到分组",
         "cmdHint": "Esc 关闭 · ↑↓ 选择 · Enter 执行",
-        "settingsTab": "订阅管理",
-        "settingsIntro": "分组、排序、批量编辑与订阅健康检查都在全屏工作台里完成。原来的「订阅源」和「分组与排序」已并入工作台。",
-        "settingsOpen": "打开订阅管理中心",
         "shortcutHint": "Ctrl+K 命令面板 · Ctrl+Shift+M 打开订阅管理"
     }
 }

@@ -9,6 +9,7 @@ import {
 } from "../schema-types"
 import Article from "./article"
 import { Feed } from "./feeds/feed"
+import SidebarDock from "./sidebar-dock"
 import ArticleSearch from "./utils/article-search"
 import { ResizeHandle } from "./utils/ResizeHandle"
 import { useResizableWidth } from "./utils/hooks/useResizableWidth"
@@ -159,6 +160,7 @@ export function ListView({
                         key={feedId}
                     />
                 </div>
+                <SidebarDock />
                 <ResizeHandle
                     label="Resize article list"
                     cursor="col-resize"

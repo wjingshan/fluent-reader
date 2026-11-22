@@ -13,6 +13,7 @@ import { deleteSourceGroupQuiet } from "../../scripts/models/manager"
 import { SourceGroup } from "../../schema-types"
 import { SourceState } from "../../scripts/models/source"
 import { useManagerStyles } from "./styles"
+import { groupTone, GroupTone } from "./palette"
 
 export interface GroupTreeProps {
     groups: SourceGroup[]
@@ -21,26 +22,13 @@ export interface GroupTreeProps {
     counts: { all: number; ungrouped: number; byGid: Record<number, number> }
     selectedSid: number | null
     dragSids: number[] | null
+    tones: Map<number, GroupTone>
     // Bumped from the command palette to open the inline "new group" input.
     createSignal?: number
     onFilter: (key: string) => void
     onSelectSource: (sid: number) => void
     onMoveSources: (sids: number[], gid: number | null) => void
 }
-
-const GROUP_COLORS = [
-    "#0f6cbd",
-    "#c94f4f",
-    "#6b5bd2",
-    "#2f8f6b",
-    "#b8791f",
-    "#4a6fa5",
-    "#a3528f",
-    "#3d7d8c",
-]
-
-export const groupColor = (gid: number) =>
-    GROUP_COLORS[Math.abs(gid) % GROUP_COLORS.length]
 
 // Group reordering uses its own drag type so a group node is never mistaken for
 // a source being dropped into a group.
@@ -257,6 +245,7 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                 {multiGroups.map(group => {
                     const isOpen = expanded.has(group.gid)
                     const active = filterKey === `g:${group.gid}`
+                    const tone = groupTone(group.gid, props.tones)
                     const members = group.sids
                         .map(sid => sources[sid])
                         .filter(source => source && !source.hidden)
@@ -275,6 +264,13 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                                             ? classes.treeInsertBefore
                                             : classes.treeInsertAfter)
                                 )}
+                                style={
+                                    active
+                                        ? {
+                                              boxShadow: `inset 3px 0 0 0 ${tone.dot}, inset 0 0 0 1px ${tone.line}`,
+                                          }
+                                        : undefined
+                                }
                                 onClick={() => props.onFilter(`g:${group.gid}`)}
                                 title={intl.get("subs.dragGroupHint")}
                                 {...groupDragProps(group)}
@@ -291,10 +287,8 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                                     }}
                                 />
                                 <span
-                                    className={classes.treeDot}
-                                    style={{
-                                        backgroundColor: groupColor(group.gid),
-                                    }}
+                                    className={classes.treeGroupBar}
+                                    style={{ backgroundColor: tone.dot }}
                                 />
                                 {editingGid === group.gid ? (
                                     <Input
@@ -363,9 +357,8 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                                                 classes.avatar
                                             )}
                                             style={{
-                                                backgroundColor: groupColor(
-                                                    group.gid
-                                                ),
+                                                backgroundColor: tone.dot,
+                                                color: "#fff",
                                                 width: "18px",
                                                 height: "18px",
                                                 fontSize: "9px",

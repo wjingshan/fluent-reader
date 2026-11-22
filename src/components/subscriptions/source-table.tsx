@@ -7,7 +7,14 @@ import {
     mergeClasses,
 } from "@fluentui/react-components"
 import { useManagerStyles } from "./styles"
-import { groupColor } from "./group-tree"
+import {
+    ALERT_TONE,
+    groupTone,
+    GroupTone,
+    NEUTRAL_TONE,
+    toneForIndex,
+    WARN_TONE,
+} from "./palette"
 import {
     avatarColor,
     ManagerRow,
@@ -31,6 +38,7 @@ export interface SourceTableProps {
         failed: number
     }
     fetchErrors: Record<number, string>
+    tones: Map<number, GroupTone>
     currentSid: number | null
     selected: Set<number>
     dragging: boolean
@@ -82,27 +90,47 @@ const SourceTable: React.FC<SourceTableProps> = props => {
 
     const showHealth =
         filterKey === "stale" || filterKey === "never" || filterKey === "failed"
-    const healthCards = [
-        { key: "all", label: intl.get("subs.all"), value: counts.all },
+    const healthCards: {
+        key: string
+        label: string
+        value: number
+        tone: GroupTone
+        warn?: boolean
+        danger?: boolean
+    }[] = [
+        {
+            key: "all",
+            label: intl.get("subs.all"),
+            value: counts.all,
+            tone: NEUTRAL_TONE,
+        },
         {
             key: "failed",
             label: intl.get("subs.failed"),
             value: counts.failed,
+            tone: ALERT_TONE,
             danger: true,
         },
         {
             key: "stale",
             label: intl.get("subs.stale"),
             value: counts.stale,
+            tone: WARN_TONE,
             warn: true,
         },
         {
             key: "never",
             label: intl.get("subs.never"),
             value: counts.never,
+            tone: toneForIndex(3),
             warn: true,
         },
-        { key: "hidden", label: intl.get("subs.hidden"), value: counts.hidden },
+        {
+            key: "hidden",
+            label: intl.get("subs.hidden"),
+            value: counts.hidden,
+            tone: NEUTRAL_TONE,
+        },
     ]
 
     return (
@@ -164,6 +192,14 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                                 filterKey === card.key &&
                                     classes.healthCardActive
                             )}
+                            style={{
+                                backgroundColor: card.tone.soft,
+                                borderColor:
+                                    filterKey === card.key
+                                        ? card.tone.dot
+                                        : card.tone.line,
+                                boxShadow: `inset 0 3px 0 0 ${card.tone.dot}`,
+                            }}
                             onClick={() => props.onFilter(card.key)}>
                             <span
                                 className={mergeClasses(
@@ -234,17 +270,21 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                         <div>{intl.get("subs.emptyHint")}</div>
                     </div>
                 ) : (
-                    rows.map(row => {
+                    rows.map((row, index) => {
                         const source = row.source
                         const error = errors[source.sid]
                         const status = statusOf(source, error)
                         const unread = source.unreadCount || 0
                         const isChecked = selected.has(source.sid)
+                        const tone = row.group
+                            ? groupTone(row.group.gid, props.tones)
+                            : NEUTRAL_TONE
                         return (
                             <div
                                 key={source.sid}
                                 className={mergeClasses(
                                     classes.row,
+                                    index % 2 === 1 && classes.rowAlt,
                                     source.sid === currentSid &&
                                         classes.rowActive,
                                     isChecked && classes.rowSelected,
@@ -306,13 +346,15 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                                 {row.group ? (
                                     <span
                                         className={classes.groupChip}
+                                        style={{
+                                            backgroundColor: tone.soft,
+                                            borderColor: tone.line,
+                                        }}
                                         title={row.group.name}>
                                         <span
                                             className={classes.groupDot}
                                             style={{
-                                                backgroundColor: groupColor(
-                                                    row.group.gid
-                                                ),
+                                                backgroundColor: tone.dot,
                                             }}
                                         />
                                         {row.group.name}

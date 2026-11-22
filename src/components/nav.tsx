@@ -19,7 +19,7 @@ import {
     openMarkAllMenu,
 } from "../scripts/models/app"
 import { toggleSearch } from "../scripts/models/page"
-import { WindowStateListenerType } from "../schema-types"
+import { WindowStateListenerType, ViewType } from "../schema-types"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
 import { FlatButtonSeparator } from "./utils/FlatButtonSeparator"
@@ -86,6 +86,11 @@ const Nav: React.FC = () => {
     const classes = useClasses()
     const dispatch = useAppDispatch()
     const state = useAppSelector(state => state.app)
+    // The list view carries its own bottom-left dock for these two entries, so
+    // the nav copies would be duplicates there.
+    const inListView = useAppSelector(
+        state => state.page.viewType === ViewType.List
+    )
     const articleOverlayOpen = useArticleOverlayOpen()
     const [maximized, setMaximized] = useState(globalThis.utils.isMaximized())
     const isWideScreen = useIsWideScreen()
@@ -354,18 +359,22 @@ const Nav: React.FC = () => {
                                 }}>
                                 <Icon iconName="View" />
                             </FlatButton>
-                            <FlatButton
-                                styleClass={classes.navBtn}
-                                title={intl.get("subs.title")}
-                                onClick={() => dispatch(openManager())}>
-                                <Icon iconName="List" />
-                            </FlatButton>
-                            <FlatButton
-                                styleClass={classes.navBtn}
-                                title={intl.get("nav.settings")}
-                                onClick={settings}>
-                                <Icon iconName="Settings" />
-                            </FlatButton>
+                            {!inListView && (
+                                <>
+                                    <FlatButton
+                                        styleClass={classes.navBtn}
+                                        title={intl.get("subs.title")}
+                                        onClick={() => dispatch(openManager())}>
+                                        <Icon iconName="List" />
+                                    </FlatButton>
+                                    <FlatButton
+                                        styleClass={classes.navBtn}
+                                        title={intl.get("nav.settings")}
+                                        onClick={settings}>
+                                        <Icon iconName="Settings" />
+                                    </FlatButton>
+                                </>
+                            )}
                         </>
                     )}
                     {!isDarwin && <FlatButtonSeparator />}

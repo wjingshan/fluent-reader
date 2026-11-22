@@ -32,6 +32,7 @@ import { urlTest } from "../../scripts/utils"
 import { closeManager, openManager } from "../../scripts/models/app"
 import { useManagerStyles } from "./styles"
 import { ManagerRow, statusOf } from "./utils"
+import { buildToneMap } from "./palette"
 import GroupTree from "./group-tree"
 import SourceTable, { ManagerSort } from "./source-table"
 import SourceInspector from "./source-inspector"
@@ -51,6 +52,8 @@ const SubscriptionManager: React.FC = () => {
     const sources = useAppSelector(state => state.sources)
     const groups = useAppSelector(state => state.groups)
     const fetchErrors = useAppSelector(state => state.app.fetchErrors)
+    // Group accent colours follow the persisted group order, not the gid.
+    const tones = useMemo(() => buildToneMap(groups), [groups])
     const [query, setQuery] = useState("")
     const [filterKey, setFilterKey] = useState("all")
     const [sort, setSort] = useState<ManagerSort>("updated")
@@ -638,6 +641,7 @@ const SubscriptionManager: React.FC = () => {
                     counts={counts}
                     selectedSid={currentSid}
                     dragSids={dragSids}
+                    tones={tones}
                     createSignal={treeCreateSignal}
                     onFilter={setFilterKey}
                     onSelectSource={setCurrentSid}
@@ -653,6 +657,7 @@ const SubscriptionManager: React.FC = () => {
                         selected={selected}
                         dragging={dragSids != null}
                         fetchErrors={fetchErrors}
+                        tones={tones}
                         onFilter={setFilterKey}
                         onSort={setSort}
                         onSelect={setCurrentSid}
@@ -790,6 +795,7 @@ const SubscriptionManager: React.FC = () => {
                     <SourceInspector
                         source={selectedSource}
                         groups={groups}
+                        tones={tones}
                         error={fetchErrors[selectedSource.sid]}
                         onDeleted={() => setCurrentSid(null)}
                     />

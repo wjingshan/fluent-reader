@@ -26,11 +26,12 @@ import { fetchItems } from "../../scripts/models/item"
 import { SourceGroup } from "../../schema-types"
 import { useManagerStyles } from "./styles"
 import { avatarColor, relativeTime, statusLabel, statusOf } from "./utils"
-import { groupColor } from "./group-tree"
+import { groupTone, GroupTone } from "./palette"
 
 export interface SourceInspectorProps {
     source: RSSSource
     groups: SourceGroup[]
+    tones?: Map<number, GroupTone>
     error?: string
     onDeleted: () => void
 }
@@ -301,9 +302,10 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                                         <span
                                             className={classes.groupDot}
                                             style={{
-                                                backgroundColor: groupColor(
-                                                    g.gid
-                                                ),
+                                                backgroundColor: groupTone(
+                                                    g.gid,
+                                                    props.tones
+                                                ).dot,
                                                 marginRight: "6px",
                                             }}
                                         />

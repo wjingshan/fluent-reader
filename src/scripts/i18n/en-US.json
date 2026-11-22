@@ -430,9 +430,6 @@
         "cmdOpenSettings": "Open settings",
         "cmdGroupPrefix": "Go to group",
         "cmdHint": "Esc to close · ↑↓ to select · Enter to run",
-        "settingsTab": "Subscriptions",
-        "settingsIntro": "Grouping, sorting, bulk editing and feed health checks all happen in the full-screen workspace. The old Sources and Groups tabs are now merged into it.",
-        "settingsOpen": "Open subscription manager",
         "shortcutHint": "Ctrl+K command palette · Ctrl+Shift+M open manager"
     }
 }
