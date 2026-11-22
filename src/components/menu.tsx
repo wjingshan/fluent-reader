@@ -267,6 +267,9 @@ export const Menu: React.FC = () => {
                 viewType={groupViews[key]}
                 onClick={() => handleSelectSource(s)}
                 onContextMenu={e => {
+                    // Without this the row's event reaches the group node and
+                    // replaces the single-source target with the whole group.
+                    e.stopPropagation()
                     handleGroupContextMenu([s.sid], e, key)
                 }}
             />

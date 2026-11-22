@@ -105,6 +105,11 @@ export class AppState {
         focusGid: null as number,
     }
 
+    // Lightweight per-source settings dialog, opened from the sidebar context
+    // menu so a single source can be adjusted without entering the manager.
+    // null means the dialog is closed.
+    sourceDialog = null as number
+
     // Last fetch error per source, keyed by sid. Written when a fetch fails and
     // cleared as soon as that source fetches successfully. Runtime only: after a
     // restart there are no known failures until the next fetch runs.
@@ -246,6 +251,7 @@ export interface MenuActionTypes {
 
 export const TOGGLE_SETTINGS = "TOGGLE_SETTINGS"
 export const TOGGLE_MANAGER = "TOGGLE_MANAGER"
+export const TOGGLE_SOURCE_DIALOG = "TOGGLE_SOURCE_DIALOG"
 export const SAVE_SETTINGS = "SAVE_SETTINGS"
 export const FREE_MEMORY = "FREE_MEMORY"
 export const SET_LAYOUT_CONFIG = "SET_LAYOUT_CONFIG"
@@ -261,6 +267,10 @@ interface ToggleManagerAction {
     type: typeof TOGGLE_MANAGER
     open: boolean
     focusGid?: number
+}
+interface ToggleSourceDialogAction {
+    type: typeof TOGGLE_SOURCE_DIALOG
+    sid: number | null
 }
 interface SaveSettingsAction {
     type: typeof SAVE_SETTINGS
@@ -285,6 +295,7 @@ interface ClearFetchErrorAction {
 export type SettingsActionTypes =
     | ToggleSettingsAction
     | ToggleManagerAction
+    | ToggleSourceDialogAction
     | SaveSettingsAction
     | FreeMemoryAction
     | SetFetchErrorAction
@@ -437,6 +448,16 @@ export const toggleManager = (open = true, focusGid: number = null) => ({
     type: TOGGLE_MANAGER,
     open: open,
     focusGid: focusGid,
+})
+
+export const openSourceDialog = (sid: number) => ({
+    type: TOGGLE_SOURCE_DIALOG,
+    sid: sid,
+})
+
+export const closeSourceDialog = () => ({
+    type: TOGGLE_SOURCE_DIALOG,
+    sid: null,
 })
 
 // Fetch health bookkeeping. A failure is recorded per source and cleared as
@@ -897,6 +918,11 @@ export function appReducer(
                     display: action.open,
                     focusGid: action.open ? action.focusGid : null,
                 },
+            }
+        case TOGGLE_SOURCE_DIALOG:
+            return {
+                ...state,
+                sourceDialog: action.sid,
             }
         case SET_LAYOUT_CONFIG:
             return {

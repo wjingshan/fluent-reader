@@ -17,6 +17,7 @@ import {
     closeContextMenu,
     ContextMenuType,
     openManager,
+    openSourceDialog,
 } from "../scripts/models/app"
 import {
     fetchItems,
@@ -546,6 +547,15 @@ function GroupContextMenu() {
             },
         },
         {
+            key: "sourceSettings",
+            text: intl.get("context.sourceSettings"),
+            iconProps: { iconName: "Edit" },
+            // Only meaningful when the menu was opened on exactly one source.
+            onClick: () => {
+                if (sids.length === 1) dispatch(openSourceDialog(sids[0]))
+            },
+        },
+        {
             key: "manage",
             text: intl.get("context.manageSources"),
             iconProps: { iconName: "Settings" },
@@ -558,6 +568,11 @@ function GroupContextMenu() {
             },
         },
     ]
+    // Editing one source is only offered for that single source, not for a
+    // group selection.
+    if (sids.length !== 1) {
+        menuItems.splice(menuItems.length - 2, 1)
+    }
     if (hasOwnView) {
         menuItems.push({
             key: "resetView",

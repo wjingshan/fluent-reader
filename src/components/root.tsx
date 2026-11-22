@@ -5,6 +5,7 @@ import { Menu } from "./menu"
 import Nav from "./nav"
 import Settings from "./settings"
 import SubscriptionManager from "./subscriptions/manager"
+import SourceSettingsDialog from "./subscriptions/source-dialog"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { ContextMenu } from "./context-menu"
 import LogMenu from "./log-menu"
@@ -98,6 +99,9 @@ const Root: React.FC = () => {
                             <SubscriptionManager />
                             <ContextMenu />
                         </div>
+                        {/* Outside #root: the manager hides #root, and this
+                            dialog must stay visible on top of either view. */}
+                        <SourceSettingsDialog />
                     </CustomStyleHooksProvider>
                 </FluentProvider>
             </ThemeProvider>
