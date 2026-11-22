@@ -369,6 +369,8 @@
         "group": "所属分组",
         "frequency": "抓取频率",
         "stats": "{feeds} 个订阅源 · {groups} 个分组",
+        "dataSection": "订阅数据",
+        "justNow": "刚刚",
         "staleStat": " · {count} 个超过 30 天未更新",
         "empty": "没有匹配的订阅源",
         "emptyHint": "换个关键词，或切换上方筛选条件。",

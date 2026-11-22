@@ -52,6 +52,7 @@ const Root: React.FC = () => {
         globalThis.settings.shouldUseDarkColors()
     )
     const layout = useAppSelector(s => s.app.layout)
+    const managerOpen = useAppSelector(s => s.app.manager.display)
     useEffect(() => {
         applyLayoutVariables(layout)
     }, [layout])
@@ -87,7 +88,8 @@ const Root: React.FC = () => {
                                       )
                                     : undefined
                             }
-                            onMouseDown={() => dispatch(closeContextMenu())}>
+                            onMouseDown={() => dispatch(closeContextMenu())}
+                            style={managerOpen ? { display: "none" } : undefined}>
                             <Nav />
                             <Page />
                             <LogMenu />

@@ -9,7 +9,7 @@ export const useManagerStyles = makeStyles({
         left: "0",
         right: "0",
         bottom: "0",
-        zIndex: 8,
+        zIndex: 60,
         display: "flex",
         flexDirection: "column",
         backgroundColor: tokens.colorNeutralBackground3,

@@ -1,5 +1,6 @@
 import * as React from "react"
 import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react/lib/Icon"
 import {
@@ -156,7 +157,7 @@ const SubscriptionManager: React.FC = () => {
         }
     }
 
-    return (
+    return createPortal(
         <div className={classes.root}>
             <div className={classes.header}>
                 <Button
@@ -268,7 +269,10 @@ const SubscriptionManager: React.FC = () => {
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        // Portal next to #root (inside the FluentProvider) so the manager keeps
+        // the v9 theme variables while staying above the reader layout.
+        document.getElementById("root")?.parentElement ?? document.body
     )
 }
 

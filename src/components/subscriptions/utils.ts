@@ -34,7 +34,7 @@ export function relativeTime(date?: Date) {
     const time = date ? new Date(date).getTime() : 0
     if (!time || time <= 0) return "—"
     const minutes = Math.floor((Date.now() - time) / 60000)
-    if (minutes < 1) return intl.get("time.now")
+    if (minutes < 1) return intl.get("subs.justNow")
     if (minutes < 60) return intl.get("time.minute", { m: minutes })
     const hours = Math.round(minutes / 60)
     if (hours < 24) return intl.get("time.hour", { h: hours })

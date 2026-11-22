@@ -362,7 +362,7 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                 </div>
                 <div className={classes.section}>
                     <div className={classes.sectionTitle}>
-                        {intl.get("subs.stats")}
+                        {intl.get("subs.dataSection")}
                     </div>
                     <div className={classes.metrics}>
                         <div className={classes.metric}>
