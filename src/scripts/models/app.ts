@@ -97,6 +97,13 @@ export class AppState {
         sids: new Array<number>(),
         saving: false,
     }
+
+    // Full-screen subscription manager. focusGid selects a group when the page
+    // is opened from a group context menu; null means "all subscriptions".
+    manager = {
+        display: false,
+        focusGid: null as number,
+    }
     logMenu = {
         display: false,
         notify: false,
@@ -232,6 +239,7 @@ export interface MenuActionTypes {
 }
 
 export const TOGGLE_SETTINGS = "TOGGLE_SETTINGS"
+export const TOGGLE_MANAGER = "TOGGLE_MANAGER"
 export const SAVE_SETTINGS = "SAVE_SETTINGS"
 export const FREE_MEMORY = "FREE_MEMORY"
 export const SET_LAYOUT_CONFIG = "SET_LAYOUT_CONFIG"
@@ -240,6 +248,11 @@ interface ToggleSettingsAction {
     type: typeof TOGGLE_SETTINGS
     open: boolean
     sids: number[]
+}
+interface ToggleManagerAction {
+    type: typeof TOGGLE_MANAGER
+    open: boolean
+    focusGid?: number
 }
 interface SaveSettingsAction {
     type: typeof SAVE_SETTINGS
@@ -254,6 +267,7 @@ interface SetLayoutConfigAction {
 }
 export type SettingsActionTypes =
     | ToggleSettingsAction
+    | ToggleManagerAction
     | SaveSettingsAction
     | FreeMemoryAction
 
@@ -399,6 +413,30 @@ export const toggleSettings = (open = true, sids = new Array<number>()) => ({
     open: open,
     sids: sids,
 })
+
+export const toggleManager = (open = true, focusGid: number = null) => ({
+    type: TOGGLE_MANAGER,
+    open: open,
+    focusGid: focusGid,
+})
+
+// Opens the manager page. When it is entered from the settings overlay, flush
+// and close that overlay first so pending settings changes are not lost and
+// only one full-screen surface is visible at a time.
+export function openManager(focusGid: number = null): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        if (getState().app.settings.display) {
+            await dispatch(exitSettings())
+        }
+        dispatch(toggleManager(true, focusGid))
+    }
+}
+
+export function closeManager(): AppThunk {
+    return dispatch => {
+        dispatch(toggleManager(false))
+    }
+}
 
 export function exitSettings(): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
@@ -814,6 +852,14 @@ export function appReducer(
                     changed: false,
                     sids: action.sids,
                     saving: false,
+                },
+            }
+        case TOGGLE_MANAGER:
+            return {
+                ...state,
+                manager: {
+                    display: action.open,
+                    focusGid: action.open ? action.focusGid : null,
                 },
             }
         case SET_LAYOUT_CONFIG:

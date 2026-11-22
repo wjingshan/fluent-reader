@@ -16,7 +16,7 @@ import {
 import {
     closeContextMenu,
     ContextMenuType,
-    toggleSettings,
+    openManager,
 } from "../scripts/models/app"
 import {
     fetchItems,
@@ -550,7 +550,11 @@ function GroupContextMenu() {
             text: intl.get("context.manageSources"),
             iconProps: { iconName: "Settings" },
             onClick: () => {
-                dispatch(toggleSettings(true, sids))
+                const gid =
+                    menuKey && menuKey.startsWith("g-")
+                        ? parseInt(menuKey.slice(2))
+                        : null
+                dispatch(openManager(gid))
             },
         },
     ]

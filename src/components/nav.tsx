@@ -14,6 +14,7 @@ import {
     toggleMenu,
     toggleLogMenu,
     toggleSettings,
+    openManager,
     openViewMenu,
     openMarkAllMenu,
 } from "../scripts/models/app"
@@ -352,6 +353,12 @@ const Nav: React.FC = () => {
                                         e.stopPropagation()
                                 }}>
                                 <Icon iconName="View" />
+                            </FlatButton>
+                            <FlatButton
+                                styleClass={classes.navBtn}
+                                title={intl.get("subs.title")}
+                                onClick={() => dispatch(openManager())}>
+                                <Icon iconName="List" />
                             </FlatButton>
                             <FlatButton
                                 styleClass={classes.navBtn}

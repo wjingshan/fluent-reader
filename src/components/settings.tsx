@@ -13,8 +13,8 @@ import ServiceTabContainer from "../containers/settings/service-container"
 import LayoutTab from "./settings/layout"
 import { initTouchBarWithTexts } from "../scripts/utils"
 import { useAppSelector, useAppDispatch } from "../scripts/reducer"
-import { exitSettings } from "../scripts/models/app"
-import { makeStyles, Spinner } from "@fluentui/react-components"
+import { exitSettings, openManager } from "../scripts/models/app"
+import { Button, makeStyles, Spinner, tokens } from "@fluentui/react-components"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
 
@@ -24,6 +24,23 @@ const useSettingsClasses = makeStyles({
         position: "absolute",
         top: "70px",
         left: "calc(50% - 404px)",
+    },
+    managerTab: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: "12px",
+        maxWidth: "520px",
+        padding: "28px 4px",
+    },
+    managerTitle: {
+        fontSize: tokens.fontSizeBase500,
+        fontWeight: tokens.fontWeightSemibold,
+    },
+    managerIntro: {
+        fontSize: tokens.fontSizeBase300,
+        lineHeight: "20px",
+        color: tokens.colorNeutralForeground3,
     },
 })
 
@@ -122,6 +139,24 @@ const Settings: React.FC = () => {
                             headerText={intl.get("settings.about")}
                             itemIcon="Info">
                             <AboutTab />
+                        </PivotItem>
+                        <PivotItem
+                            headerText={intl.get("subs.settingsTab")}
+                            itemIcon="List">
+                            <div className={settingsClasses.managerTab}>
+                                <div className={settingsClasses.managerTitle}>
+                                    {intl.get("subs.title")}
+                                </div>
+                                <div className={settingsClasses.managerIntro}>
+                                    {intl.get("subs.settingsIntro")}
+                                </div>
+                                <Button
+                                    appearance="primary"
+                                    icon={<Icon iconName="List" />}
+                                    onClick={() => dispatch(openManager())}>
+                                    {intl.get("subs.settingsOpen")}
+                                </Button>
+                            </div>
                         </PivotItem>
                     </Pivot>
                 </div>

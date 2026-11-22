@@ -4,6 +4,7 @@ import Page from "./page"
 import { Menu } from "./menu"
 import Nav from "./nav"
 import Settings from "./settings"
+import SubscriptionManager from "./subscriptions/manager"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { ContextMenu } from "./context-menu"
 import LogMenu from "./log-menu"
@@ -92,6 +93,7 @@ const Root: React.FC = () => {
                             <LogMenu />
                             <Menu />
                             <Settings />
+                            <SubscriptionManager />
                             <ContextMenu />
                         </div>
                     </CustomStyleHooksProvider>
