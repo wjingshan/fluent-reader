@@ -19,7 +19,7 @@ import {
     openMarkAllMenu,
 } from "../scripts/models/app"
 import { toggleSearch } from "../scripts/models/page"
-import { WindowStateListenerType, ViewType } from "../schema-types"
+import { WindowStateListenerType } from "../schema-types"
 import { FlatButton } from "./utils/FlatButton"
 import { FlatButtonGroup } from "./utils/FlatButtonGroup"
 import { FlatButtonSeparator } from "./utils/FlatButtonSeparator"
@@ -86,11 +86,6 @@ const Nav: React.FC = () => {
     const classes = useClasses()
     const dispatch = useAppDispatch()
     const state = useAppSelector(state => state.app)
-    // The list view carries its own bottom-left entry for the subscription
-    // manager, so the nav copy would be a duplicate there.
-    const inListView = useAppSelector(
-        state => state.page.viewType === ViewType.List
-    )
     const articleOverlayOpen = useArticleOverlayOpen()
     const [maximized, setMaximized] = useState(globalThis.utils.isMaximized())
     const isWideScreen = useIsWideScreen()
@@ -359,14 +354,12 @@ const Nav: React.FC = () => {
                                 }}>
                                 <Icon iconName="View" />
                             </FlatButton>
-                            {!inListView && (
-                                <FlatButton
-                                    styleClass={classes.navBtn}
-                                    title={intl.get("subs.title")}
-                                    onClick={() => dispatch(openManager())}>
-                                    <Icon iconName="List" />
-                                </FlatButton>
-                            )}
+                            <FlatButton
+                                styleClass={classes.navBtn}
+                                title={intl.get("subs.title")}
+                                onClick={() => dispatch(openManager())}>
+                                <Icon iconName="List" />
+                            </FlatButton>
                             <FlatButton
                                 styleClass={classes.navBtn}
                                 title={intl.get("nav.settings")}
