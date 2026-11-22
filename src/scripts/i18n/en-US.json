@@ -436,6 +436,18 @@
         "cmdOpenSettings": "Open settings",
         "cmdGroupPrefix": "Go to group",
         "cmdHint": "Esc to close · ↑↓ to select · Enter to run",
-        "shortcutHint": "Ctrl+K command palette · Ctrl+Shift+M open manager"
+        "shortcutHint": "Ctrl+K command palette · Ctrl+Shift+M open manager",
+        "selectionTitle": "{count, plural, =1 {# source selected} other {# sources selected}}",
+        "selectionSub": "{unread} unread · {groups} groups",
+        "selectionSummary": "Selection summary",
+        "selectionUnread": "Unread total",
+        "selectionGroups": "Groups in selection",
+        "selectionSettings": "Bulk settings",
+        "selectionMixed": "Mixed values",
+        "selectionHiddenMixed": "{count} of them are hidden",
+        "selectionApplied": "Applied to {count} sources",
+        "selectionLatest": "Newest update",
+        "selectionOldest": "Oldest update",
+        "selectionHint": "Changes apply to the selected sources right away and can be undone."
     }
 }

@@ -434,6 +434,18 @@
         "cmdOpenSettings": "打开设置",
         "cmdGroupPrefix": "跳到分组",
         "cmdHint": "Esc 关闭 · ↑↓ 选择 · Enter 执行",
-        "shortcutHint": "Ctrl+K 命令面板 · Ctrl+Shift+M 打开订阅管理"
+        "shortcutHint": "Ctrl+K 命令面板 · Ctrl+Shift+M 打开订阅管理",
+        "selectionTitle": "已选 {count} 个订阅源",
+        "selectionSub": "{unread} 条未读 · {groups} 个分组",
+        "selectionSummary": "选中概要",
+        "selectionUnread": "未读合计",
+        "selectionGroups": "分组分布",
+        "selectionSettings": "批量设置",
+        "selectionMixed": "多种值",
+        "selectionHiddenMixed": "其中 {count} 个已隐藏",
+        "selectionApplied": "已应用设置到 {count} 个订阅源",
+        "selectionLatest": "最近更新",
+        "selectionOldest": "最早更新",
+        "selectionHint": "修改会立即应用到勾选的订阅源，可撤销。"
     }
 }

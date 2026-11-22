@@ -36,6 +36,7 @@ import { buildToneMap } from "./palette"
 import GroupTree from "./group-tree"
 import SourceTable, { ManagerSort } from "./source-table"
 import SourceInspector from "./source-inspector"
+import SelectionInspector from "./selection-inspector"
 import CommandPalette, { ManagerCommand } from "./command-palette"
 
 const TOAST_MS = 6000
@@ -400,9 +401,25 @@ const SubscriptionManager: React.FC = () => {
         return list
     }, [selected, multiGroups, dispatch, closeAll])
 
+    // Declared before the early return below: a hook after a conditional return
+    // makes React throw "rendered more hooks than during the previous render".
+    const selectionSources = useMemo(
+        () =>
+            [...selected]
+                .map(sid => sources[sid])
+                .filter(source => source != null),
+        [selected, sources]
+    )
+
     if (!app.manager.display) return null
 
-    const selectedSource = currentSid != null ? sources[currentSid] : null
+    const selectedSource =
+        selected.size === 1
+            ? sources[[...selected][0]] ?? null
+            : selected.size === 0 && currentSid != null
+            ? sources[currentSid] ?? null
+            : null
+    const showSelection = selected.size > 1
     const staleCount = counts.stale
     const failedCount = counts.failed
 
@@ -791,7 +808,18 @@ const SubscriptionManager: React.FC = () => {
                         </div>
                     )}
                 </div>
-                {selectedSource ? (
+                {showSelection ? (
+                    <SelectionInspector
+                        sources={selectionSources}
+                        groups={groups}
+                        tones={tones}
+                        errors={fetchErrors}
+                        onRefresh={bulkRefresh}
+                        onToast={(message, undo) =>
+                            showToast(message, { undo })
+                        }
+                    />
+                ) : selectedSource ? (
                     <SourceInspector
                         source={selectedSource}
                         groups={groups}
