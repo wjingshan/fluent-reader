@@ -249,7 +249,7 @@ export const useManagerStyles = makeStyles({
         top: "0",
         zIndex: 1,
         display: "grid",
-        gridTemplateColumns: "minmax(0,1fr) 112px 58px 96px 86px",
+        gridTemplateColumns: "26px minmax(0,1fr) 112px 58px 96px 86px",
         columnGap: "10px",
         alignItems: "center",
         height: "32px",
@@ -283,7 +283,7 @@ export const useManagerStyles = makeStyles({
     },
     row: {
         "display": "grid",
-        "gridTemplateColumns": "minmax(0,1fr) 112px 58px 96px 86px",
+        "gridTemplateColumns": "26px minmax(0,1fr) 112px 58px 96px 86px",
         "columnGap": "10px",
         "alignItems": "center",
         "height": "52px",
@@ -573,5 +573,137 @@ export const useManagerStyles = makeStyles({
         padding: "24px",
         textAlign: "center",
         fontSize: tokens.fontSizeBase200,
+    },
+
+    /* ---------- bulk selection ---------- */
+    rowCheckbox: {
+        minWidth: "26px",
+    },
+    rowSelected: {
+        "backgroundColor": tokens.colorBrandBackground2,
+        ":hover": {
+            backgroundColor: tokens.colorBrandBackground2Hover,
+        },
+    },
+    bulkBar: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        flex: "0 0 48px",
+        padding: "0 14px",
+        borderTop: `1px solid ${tokens.colorNeutralStroke1}`,
+        backgroundColor: tokens.colorBrandBackground2,
+    },
+    bulkCount: {
+        fontSize: tokens.fontSizeBase200,
+        fontWeight: tokens.fontWeightSemibold,
+        color: tokens.colorBrandForeground1,
+        marginRight: "6px",
+        whiteSpace: "nowrap",
+    },
+    bulkMoveDropdown: {
+        minWidth: "150px",
+    },
+    bulkSpacer: {
+        flex: "1 1 auto",
+    },
+
+    /* ---------- undo toast ---------- */
+    toast: {
+        position: "absolute",
+        left: "50%",
+        bottom: "64px",
+        transform: "translateX(-50%)",
+        zIndex: 5,
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "8px 10px 8px 16px",
+        borderRadius: "8px",
+        backgroundColor: tokens.colorNeutralBackgroundInverted,
+        color: tokens.colorNeutralForegroundInverted,
+        boxShadow: tokens.shadow16,
+        fontSize: tokens.fontSizeBase200,
+        maxWidth: "560px",
+        whiteSpace: "nowrap",
+    },
+    toastUndo: {
+        "background": "none",
+        "border": "none",
+        "cursor": "pointer",
+        "padding": "4px 8px",
+        "borderRadius": "4px",
+        "fontFamily": "inherit",
+        "fontSize": tokens.fontSizeBase200,
+        "fontWeight": tokens.fontWeightSemibold,
+        "color": tokens.colorBrandForegroundInverted,
+        ":hover": {
+            backgroundColor: "rgba(255,255,255,0.12)",
+            color: tokens.colorBrandForegroundInvertedHover,
+        },
+    },
+    toastClose: {
+        "background": "none",
+        "border": "none",
+        "cursor": "pointer",
+        "padding": "4px 6px",
+        "borderRadius": "4px",
+        "display": "flex",
+        "alignItems": "center",
+        "color": tokens.colorNeutralForegroundInverted,
+        ":hover": {
+            backgroundColor: "rgba(255,255,255,0.12)",
+        },
+    },
+
+    /* ---------- drag & drop ---------- */
+    rowDragging: {
+        opacity: 0.5,
+    },
+    treeDropTarget: {
+        backgroundColor: tokens.colorBrandBackground2,
+        boxShadow: `inset 0 0 0 1.5px ${tokens.colorBrandStroke1}`,
+        borderRadius: "6px",
+    },
+
+    /* ---------- health cards ---------- */
+    healthCards: {
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "10px",
+        padding: "12px 14px 2px",
+        flexShrink: 0,
+    },
+    healthCard: {
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "2px",
+        "padding": "10px 12px",
+        "borderRadius": "8px",
+        "border": `1px solid ${tokens.colorNeutralStroke1}`,
+        "backgroundColor": tokens.colorNeutralBackground1,
+        "cursor": "pointer",
+        "textAlign": "left",
+        "fontFamily": "inherit",
+        ":hover": {
+            backgroundColor: tokens.colorNeutralBackground1Hover,
+        },
+    },
+    healthCardActive: {
+        border: `1.5px solid ${tokens.colorBrandStroke1}`,
+        backgroundColor: tokens.colorBrandBackground2,
+    },
+    healthValue: {
+        fontSize: tokens.fontSizeBase500,
+        fontWeight: tokens.fontWeightSemibold,
+        fontVariantNumeric: "tabular-nums",
+        color: tokens.colorNeutralForeground1,
+    },
+    healthValueWarn: {
+        color: tokens.colorStatusWarningForeground1,
+    },
+    healthLabel: {
+        fontSize: tokens.fontSizeBase100,
+        color: tokens.colorNeutralForeground3,
     },
 })

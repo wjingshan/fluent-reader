@@ -19,8 +19,10 @@ export interface GroupTreeProps {
     filterKey: string
     counts: { all: number; ungrouped: number; byGid: Record<number, number> }
     selectedSid: number | null
+    dragSids: number[] | null
     onFilter: (key: string) => void
     onSelectSource: (sid: number) => void
+    onMoveSources: (sids: number[], gid: number | null) => void
 }
 
 const GROUP_COLORS = [
@@ -38,7 +40,7 @@ export const groupColor = (gid: number) =>
     GROUP_COLORS[Math.abs(gid) % GROUP_COLORS.length]
 
 const GroupTree: React.FC<GroupTreeProps> = props => {
-    const { groups, sources, filterKey, counts, selectedSid } = props
+    const { groups, sources, filterKey, counts, selectedSid, dragSids } = props
     const dispatch = useAppDispatch()
     const classes = useManagerStyles()
     const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
@@ -46,6 +48,39 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
     const [draftName, setDraftName] = useState("")
     const [creating, setCreating] = useState(false)
     const [newName, setNewName] = useState("")
+    const [dropKey, setDropKey] = useState<string>(null)
+
+    const dropProps = (key: string, gid: number | null) => ({
+        onDragOver: (event: React.DragEvent) => {
+            const hasPayload =
+                dragSids || event.dataTransfer.types.includes("text/plain")
+            if (!hasPayload) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = "move"
+            setDropKey(key)
+        },
+        onDragLeave: () => {
+            setDropKey(prev => (prev === key ? null : prev))
+        },
+        onDrop: (event: React.DragEvent) => {
+            event.preventDefault()
+            setDropKey(null)
+            let sids = dragSids
+            if (!sids) {
+                try {
+                    const parsed = JSON.parse(
+                        event.dataTransfer.getData("text/plain")
+                    )
+                    if (Array.isArray(parsed)) sids = parsed
+                } catch {
+                    sids = null
+                }
+            }
+            if (sids && sids.length > 0) {
+                props.onMoveSources(sids, gid)
+            }
+        },
+    })
 
     const multiGroups = useMemo(
         () => groups.filter(g => g.isMultiple),
@@ -118,9 +153,11 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                 <div
                     className={mergeClasses(
                         classes.treeItem,
-                        filterKey === "ungrouped" && classes.treeItemActive
+                        filterKey === "ungrouped" && classes.treeItemActive,
+                        dropKey === "ungrouped" && classes.treeDropTarget
                     )}
-                    onClick={() => props.onFilter("ungrouped")}>
+                    onClick={() => props.onFilter("ungrouped")}
+                    {...dropProps("ungrouped", null)}>
                     <span style={{ width: "14px" }} />
                     <span className={classes.treeDot} />
                     <span className={classes.treeLabel}>
@@ -142,11 +179,12 @@ const GroupTree: React.FC<GroupTreeProps> = props => {
                             <div
                                 className={mergeClasses(
                                     classes.treeItem,
-                                    active && classes.treeItemActive
+                                    active && classes.treeItemActive,
+                                    dropKey === `g:${group.gid}` &&
+                                        classes.treeDropTarget
                                 )}
-                                onClick={() =>
-                                    props.onFilter(`g:${group.gid}`)
-                                }>
+                                onClick={() => props.onFilter(`g:${group.gid}`)}
+                                {...dropProps(`g:${group.gid}`, group.gid)}>
                                 <Icon
                                     iconName="ChevronRight"
                                     className={mergeClasses(

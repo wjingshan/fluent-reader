@@ -1,17 +1,32 @@
 import * as React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react/lib/Icon"
 import {
     Button,
+    Dropdown,
     Input,
+    Option,
     Spinner,
     mergeClasses,
 } from "@fluentui/react-components"
 import { useAppDispatch, useAppSelector } from "../../scripts/reducer"
-import { addSource } from "../../scripts/models/source"
-import { importOPML, exportOPML } from "../../scripts/models/group"
+import {
+    addSource,
+    toggleSourceHidden,
+    RSSSource,
+} from "../../scripts/models/source"
+import {
+    importOPML,
+    exportOPML,
+    reorderSourceGroups,
+} from "../../scripts/models/group"
+import { fetchItems } from "../../scripts/models/item"
+import {
+    moveSourcesToGroup,
+    deleteSourcesQuiet,
+} from "../../scripts/models/manager"
 import { urlTest } from "../../scripts/utils"
 import { closeManager } from "../../scripts/models/app"
 import { useManagerStyles } from "./styles"
@@ -19,6 +34,13 @@ import { ManagerRow, statusOf } from "./utils"
 import GroupTree from "./group-tree"
 import SourceTable, { ManagerSort } from "./source-table"
 import SourceInspector from "./source-inspector"
+
+const TOAST_MS = 6000
+
+interface ToastState {
+    message: string
+    undo?: () => void
+}
 
 const SubscriptionManager: React.FC = () => {
     const dispatch = useAppDispatch()
@@ -32,6 +54,59 @@ const SubscriptionManager: React.FC = () => {
     const [currentSid, setCurrentSid] = useState<number>(null)
     const [addUrl, setAddUrl] = useState("")
     const [adding, setAdding] = useState(false)
+    const [selected, setSelected] = useState<Set<number>>(() => new Set())
+    const [anchorSid, setAnchorSid] = useState<number>(null)
+    const [dragSids, setDragSids] = useState<number[]>(null)
+    const [pendingDelete, setPendingDelete] = useState<Set<number>>(
+        () => new Set()
+    )
+    const [toast, setToast] = useState<ToastState>(null)
+    const toastCommitRef = useRef<() => void>(null)
+    const toastTimerRef = useRef<number>(null)
+
+    // Finalize the visible toast: run its deferred commit (e.g. the actual
+    // deletion) unless it is being undone.
+    const finalizeToast = useCallback(() => {
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current)
+            toastTimerRef.current = null
+        }
+        const commit = toastCommitRef.current
+        toastCommitRef.current = null
+        setToast(null)
+        if (commit) commit()
+    }, [])
+
+    const showToast = useCallback(
+        (message: string, opts: { undo?: () => void; commit?: () => void }) => {
+            finalizeToast()
+            toastCommitRef.current = opts.commit || null
+            setToast({ message, undo: opts.undo })
+            toastTimerRef.current = window.setTimeout(
+                finalizeToast,
+                TOAST_MS
+            ) as unknown as number
+        },
+        [finalizeToast]
+    )
+
+    const undoToast = () => {
+        const undo = toast?.undo
+        if (toastTimerRef.current) {
+            clearTimeout(toastTimerRef.current)
+            toastTimerRef.current = null
+        }
+        toastCommitRef.current = null
+        setToast(null)
+        if (undo) undo()
+    }
+
+    useEffect(() => finalizeToast, [finalizeToast])
+
+    const closeAll = useCallback(() => {
+        finalizeToast()
+        dispatch(closeManager())
+    }, [dispatch, finalizeToast])
 
     useEffect(() => {
         if (!app.manager.display) return
@@ -42,11 +117,16 @@ const SubscriptionManager: React.FC = () => {
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") dispatch(closeManager())
+            if (event.key !== "Escape") return
+            if (selected.size > 0) {
+                setSelected(new Set())
+                return
+            }
+            closeAll()
         }
         window.addEventListener("keydown", onKeyDown)
         return () => window.removeEventListener("keydown", onKeyDown)
-    }, [dispatch])
+    }, [closeAll, selected.size])
 
     const groupBySid = useMemo(() => {
         const map = new Map<number, typeof groups[number]>()
@@ -56,10 +136,28 @@ const SubscriptionManager: React.FC = () => {
         return map
     }, [groups])
 
-    const allSources = useMemo(
-        () => Object.values(sources).filter(source => source),
-        [sources]
+    const multiGroups = useMemo(
+        () => groups.filter(g => g.isMultiple),
+        [groups]
     )
+
+    const allSources = useMemo(
+        () =>
+            Object.values(sources).filter(
+                source => source && !pendingDelete.has(source.sid)
+            ),
+        [sources, pendingDelete]
+    )
+
+    // Drop selections whose sources no longer exist.
+    useEffect(() => {
+        setSelected(prev => {
+            const next = new Set(
+                [...prev].filter(sid => sources[sid] && !pendingDelete.has(sid))
+            )
+            return next.size === prev.size ? prev : next
+        })
+    }, [sources, pendingDelete])
 
     const rows = useMemo(() => {
         const visible = allSources.filter(source => !source.hidden)
@@ -69,6 +167,8 @@ const SubscriptionManager: React.FC = () => {
             list = visible.filter(source => !groupBySid.has(source.sid))
         } else if (filterKey === "stale") {
             list = visible.filter(source => statusOf(source) === "stale")
+        } else if (filterKey === "never") {
+            list = visible.filter(source => !source.lastFetched)
         } else if (filterKey === "hidden") {
             list = allSources.filter(source => source.hidden)
         } else if (filterKey.startsWith("g:")) {
@@ -107,26 +207,50 @@ const SubscriptionManager: React.FC = () => {
         return result
     }, [allSources, filterKey, groupBySid, query, sort])
 
+    // While a selection is active, freeze the row order: background fetches
+    // keep updating lastFetched, and re-sorting mid-selection would move
+    // checkboxes under the pointer.
+    const frozenOrderRef = useRef<number[]>(null)
+    const orderedRows = useMemo(() => {
+        if (selected.size === 0) {
+            frozenOrderRef.current = null
+            return rows
+        }
+        if (!frozenOrderRef.current) {
+            frozenOrderRef.current = rows.map(row => row.source.sid)
+        }
+        const pos = new Map(
+            frozenOrderRef.current.map((sid, index) => [sid, index])
+        )
+        return [...rows].sort(
+            (a, b) =>
+                (pos.get(a.source.sid) ?? Number.MAX_SAFE_INTEGER) -
+                (pos.get(b.source.sid) ?? Number.MAX_SAFE_INTEGER)
+        )
+    }, [rows, selected.size])
+
     const counts = useMemo(() => {
         const visible = allSources.filter(source => !source.hidden)
         const byGid: Record<number, number> = {}
-        groups
-            .filter(g => g.isMultiple)
-            .forEach(group => {
-                byGid[group.gid] = group.sids.filter(
-                    sid => sources[sid] && !sources[sid].hidden
-                ).length
-            })
+        multiGroups.forEach(group => {
+            byGid[group.gid] = group.sids.filter(
+                sid =>
+                    sources[sid] &&
+                    !sources[sid].hidden &&
+                    !pendingDelete.has(sid)
+            ).length
+        })
         return {
-            all: allSources.filter(source => !source.hidden).length,
+            all: visible.length,
             ungrouped: visible.filter(source => !groupBySid.has(source.sid))
                 .length,
             stale: visible.filter(source => statusOf(source) === "stale")
                 .length,
+            never: visible.filter(source => !source.lastFetched).length,
             hidden: allSources.length - visible.length,
             byGid,
         }
-    }, [allSources, groupBySid, groups, sources])
+    }, [allSources, groupBySid, multiGroups, sources, pendingDelete])
 
     useEffect(() => {
         if (!rows.some(row => row.source.sid === currentSid)) {
@@ -157,6 +281,118 @@ const SubscriptionManager: React.FC = () => {
         }
     }
 
+    /* ---------- selection ---------- */
+
+    const toggleSelect = (sid: number, shiftKey: boolean) => {
+        setSelected(prev => {
+            const next = new Set(prev)
+            if (shiftKey && anchorSid != null) {
+                const ids = orderedRows.map(row => row.source.sid)
+                const from = ids.indexOf(anchorSid)
+                const to = ids.indexOf(sid)
+                if (from !== -1 && to !== -1) {
+                    const [lo, hi] = from < to ? [from, to] : [to, from]
+                    for (let i = lo; i <= hi; i += 1) next.add(ids[i])
+                    return next
+                }
+            }
+            if (next.has(sid)) next.delete(sid)
+            else next.add(sid)
+            return next
+        })
+        setAnchorSid(sid)
+    }
+
+    const toggleAll = () => {
+        const ids = orderedRows.map(row => row.source.sid)
+        const allChecked = ids.length > 0 && ids.every(sid => selected.has(sid))
+        setSelected(prev => {
+            const next = new Set(prev)
+            ids.forEach(sid => {
+                if (allChecked) next.delete(sid)
+                else next.add(sid)
+            })
+            return next
+        })
+    }
+
+    /* ---------- bulk actions ---------- */
+
+    const moveSelected = (sids: number[], gid: number | null) => {
+        const snapshot = dispatch(moveSourcesToGroup(sids, gid))
+        if (!snapshot) return
+        const targetName =
+            gid === null
+                ? null
+                : multiGroups.find(g => g.gid === gid)?.name || ""
+        showToast(
+            gid === null
+                ? intl.get("subs.movedUngroupedToast", { count: sids.length })
+                : intl.get("subs.movedToast", {
+                      count: sids.length,
+                      name: targetName,
+                  }),
+            { undo: () => dispatch(reorderSourceGroups(snapshot)) }
+        )
+    }
+
+    const bulkSetHidden = async (hide: boolean) => {
+        for (const sid of [...selected]) {
+            const source = sources[sid]
+            if (source && Boolean(source.hidden) !== hide) {
+                await dispatch(toggleSourceHidden(source))
+            }
+        }
+    }
+
+    const bulkRefresh = () => {
+        dispatch(fetchItems(true, [...selected]))
+    }
+
+    const bulkDelete = () => {
+        const sids = [...selected]
+        const doomed: RSSSource[] = sids
+            .map(sid => sources[sid])
+            .filter(Boolean)
+        if (doomed.length === 0) return
+        setSelected(new Set())
+        setPendingDelete(prev => new Set([...prev, ...sids]))
+        showToast(intl.get("subs.deletedToast", { count: doomed.length }), {
+            undo: () => {
+                setPendingDelete(prev => {
+                    const next = new Set(prev)
+                    sids.forEach(sid => next.delete(sid))
+                    return next
+                })
+            },
+            commit: () => {
+                setPendingDelete(prev => {
+                    const next = new Set(prev)
+                    sids.forEach(sid => next.delete(sid))
+                    return next
+                })
+                void dispatch(deleteSourcesQuiet(doomed))
+            },
+        })
+    }
+
+    /* ---------- drag & drop ---------- */
+
+    const onDragStartRow = (sid: number, event: React.DragEvent) => {
+        const sids =
+            selected.has(sid) && selected.size > 0 ? [...selected] : [sid]
+        setDragSids(sids)
+        event.dataTransfer.effectAllowed = "move"
+        event.dataTransfer.setData("text/plain", JSON.stringify(sids))
+    }
+
+    const onMoveSources = (sids: number[], gid: number | null) => {
+        setDragSids(null)
+        moveSelected(sids, gid)
+    }
+
+    const selectedHiddenVisible = filterKey === "hidden"
+
     return createPortal(
         <div className={classes.root}>
             <div className={classes.header}>
@@ -164,7 +400,7 @@ const SubscriptionManager: React.FC = () => {
                     appearance="subtle"
                     className={classes.backButton}
                     icon={<Icon iconName="Back" />}
-                    onClick={() => dispatch(closeManager())}>
+                    onClick={closeAll}>
                     {intl.get("subs.back")}
                 </Button>
                 <div className={classes.titles}>
@@ -174,7 +410,7 @@ const SubscriptionManager: React.FC = () => {
                     <div className={classes.subtitle}>
                         {intl.get("subs.stats", {
                             feeds: counts.all,
-                            groups: groups.filter(g => g.isMultiple).length,
+                            groups: multiGroups.length,
                         })}
                         {staleCount > 0 &&
                             intl.get("subs.staleStat", { count: staleCount })}
@@ -206,7 +442,7 @@ const SubscriptionManager: React.FC = () => {
                         appearance="subtle"
                         icon={<Icon iconName="Cancel" />}
                         title={intl.get("subs.back")}
-                        onClick={() => dispatch(closeManager())}
+                        onClick={closeAll}
                     />
                 </div>
             </div>
@@ -235,20 +471,104 @@ const SubscriptionManager: React.FC = () => {
                     filterKey={filterKey}
                     counts={counts}
                     selectedSid={currentSid}
+                    dragSids={dragSids}
                     onFilter={setFilterKey}
                     onSelectSource={setCurrentSid}
+                    onMoveSources={onMoveSources}
                 />
                 <div className={classes.pane}>
                     <SourceTable
-                        rows={rows}
+                        rows={orderedRows}
                         filterKey={filterKey}
                         sort={sort}
                         counts={counts}
                         currentSid={currentSid}
+                        selected={selected}
+                        dragging={dragSids != null}
                         onFilter={setFilterKey}
                         onSort={setSort}
                         onSelect={setCurrentSid}
+                        onToggleSelect={toggleSelect}
+                        onToggleAll={toggleAll}
+                        onDragStartRow={onDragStartRow}
+                        onDragEndRow={() => setDragSids(null)}
                     />
+                    {selected.size > 0 && (
+                        <div className={classes.bulkBar}>
+                            <span className={classes.bulkCount}>
+                                {intl.get("subs.selectedCount", {
+                                    count: selected.size,
+                                })}
+                            </span>
+                            <Dropdown
+                                size="small"
+                                className={classes.bulkMoveDropdown}
+                                value={intl.get("subs.moveTo")}
+                                selectedOptions={[]}
+                                onOptionSelect={(_, data) => {
+                                    if (!data.optionValue) return
+                                    moveSelected(
+                                        [...selected],
+                                        data.optionValue === "ungrouped"
+                                            ? null
+                                            : parseInt(data.optionValue)
+                                    )
+                                }}>
+                                <Option
+                                    value="ungrouped"
+                                    text={intl.get("subs.ungrouped")}>
+                                    {intl.get("subs.ungrouped")}
+                                </Option>
+                                {multiGroups.map(group => (
+                                    <Option
+                                        key={group.gid}
+                                        value={String(group.gid)}
+                                        text={group.name}>
+                                        {group.name}
+                                    </Option>
+                                ))}
+                            </Dropdown>
+                            {selectedHiddenVisible ? (
+                                <Button
+                                    size="small"
+                                    appearance="subtle"
+                                    icon={<Icon iconName="View" />}
+                                    onClick={() => void bulkSetHidden(false)}>
+                                    {intl.get("subs.bulkShow")}
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="small"
+                                    appearance="subtle"
+                                    icon={<Icon iconName="Hide" />}
+                                    onClick={() => void bulkSetHidden(true)}>
+                                    {intl.get("subs.bulkHide")}
+                                </Button>
+                            )}
+                            <Button
+                                size="small"
+                                appearance="subtle"
+                                icon={<Icon iconName="Refresh" />}
+                                onClick={bulkRefresh}>
+                                {intl.get("subs.bulkRefresh")}
+                            </Button>
+                            <Button
+                                size="small"
+                                appearance="subtle"
+                                className={classes.dangerButton}
+                                icon={<Icon iconName="Delete" />}
+                                onClick={bulkDelete}>
+                                {intl.get("subs.bulkDelete")}
+                            </Button>
+                            <span className={classes.bulkSpacer} />
+                            <Button
+                                size="small"
+                                appearance="subtle"
+                                onClick={() => setSelected(new Set())}>
+                                {intl.get("subs.clearSelection")}
+                            </Button>
+                        </div>
+                    )}
                 </div>
                 {selectedSource ? (
                     <SourceInspector
@@ -269,6 +589,24 @@ const SubscriptionManager: React.FC = () => {
                     </div>
                 )}
             </div>
+            {toast && (
+                <div className={classes.toast}>
+                    <span>{toast.message}</span>
+                    {toast.undo && (
+                        <button
+                            className={classes.toastUndo}
+                            onClick={undoToast}>
+                            {intl.get("subs.undo")}
+                        </button>
+                    )}
+                    <button
+                        className={classes.toastClose}
+                        title={intl.get("subs.dismiss")}
+                        onClick={finalizeToast}>
+                        <Icon iconName="Cancel" />
+                    </button>
+                </div>
+            )}
         </div>,
         // Portal next to #root (inside the FluentProvider) so the manager keeps
         // the v9 theme variables while staying above the reader layout.

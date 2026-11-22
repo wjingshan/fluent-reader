@@ -1,6 +1,11 @@
 import * as React from "react"
 import intl from "react-intl-universal"
-import { Dropdown, Option, mergeClasses } from "@fluentui/react-components"
+import {
+    Checkbox,
+    Dropdown,
+    Option,
+    mergeClasses,
+} from "@fluentui/react-components"
 import { useManagerStyles } from "./styles"
 import { groupColor } from "./group-tree"
 import {
@@ -22,15 +27,22 @@ export interface SourceTableProps {
         ungrouped: number
         stale: number
         hidden: number
+        never: number
     }
     currentSid: number | null
+    selected: Set<number>
+    dragging: boolean
     onFilter: (key: string) => void
     onSort: (sort: ManagerSort) => void
     onSelect: (sid: number) => void
+    onToggleSelect: (sid: number, shiftKey: boolean) => void
+    onToggleAll: () => void
+    onDragStartRow: (sid: number, event: React.DragEvent) => void
+    onDragEndRow: () => void
 }
 
 const SourceTable: React.FC<SourceTableProps> = props => {
-    const { rows, filterKey, sort, counts, currentSid } = props
+    const { rows, filterKey, sort, counts, currentSid, selected } = props
     const classes = useManagerStyles()
 
     const chips: {
@@ -54,6 +66,28 @@ const SourceTable: React.FC<SourceTableProps> = props => {
         name: intl.get("subs.sortName"),
         unread: intl.get("subs.sortUnread"),
     }[sort]
+
+    const allChecked =
+        rows.length > 0 && rows.every(row => selected.has(row.source.sid))
+    const someChecked = rows.some(row => selected.has(row.source.sid))
+
+    const showHealth = filterKey === "stale" || filterKey === "never"
+    const healthCards = [
+        { key: "all", label: intl.get("subs.all"), value: counts.all },
+        {
+            key: "stale",
+            label: intl.get("subs.stale"),
+            value: counts.stale,
+            warn: true,
+        },
+        {
+            key: "never",
+            label: intl.get("subs.never"),
+            value: counts.never,
+            warn: true,
+        },
+        { key: "hidden", label: intl.get("subs.hidden"), value: counts.hidden },
+    ]
 
     return (
         <>
@@ -96,8 +130,43 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                     </Dropdown>
                 </div>
             </div>
+            {showHealth && (
+                <div className={classes.healthCards}>
+                    {healthCards.map(card => (
+                        <button
+                            key={card.key}
+                            className={mergeClasses(
+                                classes.healthCard,
+                                filterKey === card.key &&
+                                    classes.healthCardActive
+                            )}
+                            onClick={() => props.onFilter(card.key)}>
+                            <span
+                                className={mergeClasses(
+                                    classes.healthValue,
+                                    card.warn &&
+                                        card.value > 0 &&
+                                        classes.healthValueWarn
+                                )}>
+                                {card.value}
+                            </span>
+                            <span className={classes.healthLabel}>
+                                {card.label}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
             <div className={classes.tableScroll}>
                 <div className={classes.tableHead}>
+                    <Checkbox
+                        className={classes.rowCheckbox}
+                        checked={
+                            allChecked ? true : someChecked ? "mixed" : false
+                        }
+                        onChange={() => props.onToggleAll()}
+                        title={intl.get("subs.selectAll")}
+                    />
                     <button
                         className={mergeClasses(
                             classes.thButton,
@@ -142,15 +211,37 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                         const source = row.source
                         const status = statusOf(source)
                         const unread = source.unreadCount || 0
+                        const isChecked = selected.has(source.sid)
                         return (
                             <div
                                 key={source.sid}
                                 className={mergeClasses(
                                     classes.row,
                                     source.sid === currentSid &&
-                                        classes.rowActive
+                                        classes.rowActive,
+                                    isChecked && classes.rowSelected,
+                                    props.dragging &&
+                                        isChecked &&
+                                        classes.rowDragging
                                 )}
+                                draggable
+                                onDragStart={event =>
+                                    props.onDragStartRow(source.sid, event)
+                                }
+                                onDragEnd={props.onDragEndRow}
                                 onClick={() => props.onSelect(source.sid)}>
+                                <Checkbox
+                                    className={classes.rowCheckbox}
+                                    checked={isChecked}
+                                    onClick={event => {
+                                        event.stopPropagation()
+                                        props.onToggleSelect(
+                                            source.sid,
+                                            event.shiftKey
+                                        )
+                                    }}
+                                    onChange={() => undefined}
+                                />
                                 <div className={classes.feed}>
                                     <div
                                         className={classes.avatar}
@@ -245,6 +336,7 @@ const SourceTable: React.FC<SourceTableProps> = props => {
                 <span>
                     {rows.length} / {counts.all + counts.hidden}
                 </span>
+                <span>{intl.get("subs.dragHint")}</span>
             </div>
         </>
     )
