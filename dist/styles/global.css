@@ -178,3 +178,20 @@ i[data-icon-name="StatusCircleCheckmark"] {
 body.darwin #root > nav span.title {
     max-width: 220px;
 }
+
+/*
+ * Fluent UI v9 portals its dropdown listboxes into a document level node
+ * (position: absolute, top/left/right: 0, z-index: 1000000). That node ends up
+ * covering the whole window and, with pointer-events left at its default, it
+ * swallowed real mouse input: the mousedown reached the dropdown trigger, but
+ * the mouseup/click landed on the portal node, so the dropdown never opened
+ * (synthetic clicks in scripts bypass this, which is why it only showed up when
+ * clicking by hand). Keep the portal node itself click-through and hand pointer
+ * events back to its content.
+ */
+div[data-portal-node] {
+    pointer-events: none;
+}
+div[data-portal-node] * {
+    pointer-events: auto;
+}
