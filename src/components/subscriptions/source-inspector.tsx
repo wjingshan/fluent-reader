@@ -25,7 +25,14 @@ import {
 import { fetchItems } from "../../scripts/models/item"
 import { SourceGroup } from "../../schema-types"
 import { useManagerStyles } from "./styles"
-import { avatarColor, relativeTime, statusLabel, statusOf } from "./utils"
+import {
+    FREQUENCY_OPTIONS,
+    avatarColor,
+    frequencyLabel,
+    relativeTime,
+    statusLabel,
+    statusOf,
+} from "./utils"
 import { groupTone, GroupTone } from "./palette"
 
 export interface SourceInspectorProps {
@@ -34,26 +41,6 @@ export interface SourceInspectorProps {
     tones?: Map<number, GroupTone>
     error?: string
     onDeleted: () => void
-}
-
-const FREQUENCIES = [0, 15, 30, 60, 120, 180, 360, 720, 1440]
-
-const frequencyLabel = (frequency: number) => {
-    switch (frequency) {
-        case 15:
-        case 30:
-            return intl.get("time.minute", { m: frequency })
-        case 60:
-        case 120:
-        case 180:
-        case 360:
-        case 720:
-            return intl.get("time.hour", { h: frequency / 60 })
-        case 1440:
-            return intl.get("time.day", { d: 1 })
-        default:
-            return intl.get("sources.unlimited")
-    }
 }
 
 const groupOf = (groups: SourceGroup[], sid: number) =>
@@ -377,7 +364,7 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                                 onOptionSelect={(_, data) =>
                                     commitFrequency(data.optionValue as string)
                                 }>
-                                {FREQUENCIES.map(f => (
+                                {FREQUENCY_OPTIONS.map(f => (
                                     <Option
                                         key={f}
                                         value={String(f)}

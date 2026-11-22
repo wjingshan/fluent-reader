@@ -26,7 +26,9 @@
         "d": "d",
         "minute": "{m}分钟",
         "hour": "{h}小时",
-        "day": "{d}天"
+        "day": "{d}天",
+        "week": "{w}周",
+        "month": "{n}个月"
     },
     "log": {
         "empty": "无消息",

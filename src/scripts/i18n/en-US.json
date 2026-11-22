@@ -26,7 +26,9 @@
         "d": "d",
         "minute": "{m, plural, =1 {# minute} other {# minutes}}",
         "hour": "{h, plural, =1 {# hour} other {# hours}}",
-        "day": "{d, plural, =1 {# day} other {# days}}"
+        "day": "{d, plural, =1 {# day} other {# days}}",
+        "week": "{w, plural, =1 {# week} other {# weeks}}",
+        "month": "{n, plural, =1 {# month} other {# months}}"
     },
     "log": {
         "empty": "No notifications",

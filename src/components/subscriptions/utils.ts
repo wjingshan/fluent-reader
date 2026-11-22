@@ -35,6 +35,25 @@ export function statusLabel(status: SourceStatus) {
     }
 }
 
+// Per-source fetch frequency, in minutes. 0 means no limit.
+export const FREQUENCY_OPTIONS = [0, 15, 30, 60, 120, 180, 360, 720, 1440, 10080, 43200]
+
+const MINUTES_PER_DAY = 1440
+const MINUTES_PER_WEEK = 10080
+const MINUTES_PER_MONTH = 43200
+
+export function frequencyLabel(frequency: number) {
+    if (!frequency || frequency <= 0) return intl.get("sources.unlimited")
+    if (frequency >= MINUTES_PER_MONTH && frequency % MINUTES_PER_MONTH === 0)
+        return intl.get("time.month", { n: frequency / MINUTES_PER_MONTH })
+    if (frequency < 60) return intl.get("time.minute", { m: frequency })
+    if (frequency < MINUTES_PER_DAY)
+        return intl.get("time.hour", { h: Math.round(frequency / 60) })
+    if (frequency % MINUTES_PER_WEEK === 0)
+        return intl.get("time.week", { w: frequency / MINUTES_PER_WEEK })
+    return intl.get("time.day", { d: Math.round(frequency / MINUTES_PER_DAY) })
+}
+
 export function relativeTime(date?: Date) {
     const time = date ? new Date(date).getTime() : 0
     if (!time || time <= 0) return "—"

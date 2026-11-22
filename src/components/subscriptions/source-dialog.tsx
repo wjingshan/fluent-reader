@@ -29,7 +29,14 @@ import {
 } from "../../scripts/models/group"
 import { fetchItems } from "../../scripts/models/item"
 import { SourceGroup } from "../../schema-types"
-import { avatarColor, relativeTime, statusLabel, statusOf } from "./utils"
+import {
+    FREQUENCY_OPTIONS,
+    avatarColor,
+    frequencyLabel,
+    relativeTime,
+    statusLabel,
+    statusOf,
+} from "./utils"
 import { buildToneMap, groupTone } from "./palette"
 
 const useClasses = makeStyles({
@@ -148,26 +155,6 @@ const useClasses = makeStyles({
     },
     footSpacer: { flexGrow: 1 },
 })
-
-const FREQUENCIES = [0, 15, 30, 60, 120, 180, 360, 720, 1440]
-
-const frequencyLabel = (frequency: number) => {
-    switch (frequency) {
-        case 15:
-        case 30:
-            return intl.get("time.minute", { m: frequency })
-        case 60:
-        case 120:
-        case 180:
-        case 360:
-        case 720:
-            return intl.get("time.hour", { h: frequency / 60 })
-        case 1440:
-            return intl.get("time.day", { d: 1 })
-        default:
-            return intl.get("sources.unlimited")
-    }
-}
 
 const groupOf = (groups: SourceGroup[], sid: number) =>
     groups.find(g => g.isMultiple && g.sids.includes(sid))
@@ -448,7 +435,7 @@ const SourceSettingsForm: React.FC<FormProps> = props => {
                                 onOptionSelect={(_, data) =>
                                     commitFrequency(data.optionValue as string)
                                 }>
-                                {FREQUENCIES.map(f => (
+                                {FREQUENCY_OPTIONS.map(f => (
                                     <Option
                                         key={f}
                                         value={String(f)}
