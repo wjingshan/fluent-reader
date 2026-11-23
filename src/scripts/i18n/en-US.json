@@ -448,6 +448,7 @@
         "selectionHiddenMixed": "{count} of them are hidden",
         "selectionApplied": "Applied to {count} sources",
         "selectionAppliedPartial": "Applied to {count}, {failed} failed",
+        "editHint": "Name, URL and group save when you press Enter or click away.",
         "selectionLatest": "Newest update",
         "selectionOldest": "Oldest update",
         "selectionHint": "Changes apply to the selected sources right away and can be undone."

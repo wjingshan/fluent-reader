@@ -436,14 +436,28 @@ function sourceDbValues(source: RSSSource) {
 export function updateSource(source: RSSSource): AppThunk<Promise<void>> {
     return async dispatch => {
         const dbValues = sourceDbValues(source)
-        await database
-            .insert(sourcesTable)
-            .values(dbValues)
-            .onConflictDoUpdate({
-                target: sourcesTable.sid,
-                set: dbValues,
-            })
-        dispatch(updateSourceDone(source))
+        const write = () =>
+            database
+                .insert(sourcesTable)
+                .values(dbValues)
+                .onConflictDoUpdate({
+                    target: sourcesTable.sid,
+                    set: dbValues,
+                })
+        // A background fetch can hold the write lock for a moment; retry a few
+        // times so an edit from the UI is not silently dropped.
+        let lastError: unknown = null
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            try {
+                await write()
+                dispatch(updateSourceDone(source))
+                return
+            } catch (err) {
+                lastError = err
+                await new Promise(resolve => setTimeout(resolve, 80 * (attempt + 1)))
+            }
+        }
+        throw lastError
     }
 }
 

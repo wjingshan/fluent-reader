@@ -188,7 +188,13 @@ const SourceSettingsForm: React.FC<FormProps> = props => {
             setName(source.name || "")
             return
         }
-        dispatch(updateSource({ ...source, name: next }))
+        dispatch(updateSource({ ...source, name: next })).catch(err => {
+            setName(source.name || "")
+            window.utils.showErrorBox(
+                intl.get("settings.writeError"),
+                String(err)
+            )
+        })
     }
 
     const commitUrl = () => {
@@ -211,16 +217,23 @@ const SourceSettingsForm: React.FC<FormProps> = props => {
         )
     }
 
+    const save = (patch: Partial<RSSSource>) => {
+        dispatch(updateSource({ ...source, ...patch })).catch(err =>
+            window.utils.showErrorBox(
+                intl.get("settings.writeError"),
+                String(err)
+            )
+        )
+    }
+
     const commitFrequency = (value: string) => {
         const next = parseInt(value)
-        if (next !== source.fetchFrequency)
-            dispatch(updateSource({ ...source, fetchFrequency: next }))
+        if (next !== source.fetchFrequency) save({ fetchFrequency: next })
     }
 
     const commitOpenTarget = (value: string) => {
         const next = parseInt(value) as SourceOpenTarget
-        if (next !== source.openTarget)
-            dispatch(updateSource({ ...source, openTarget: next }))
+        if (next !== source.openTarget) save({ openTarget: next })
     }
 
     const moveToGroup = (value: string) => {
@@ -452,14 +465,7 @@ const SourceSettingsForm: React.FC<FormProps> = props => {
                         </span>
                         <Switch
                             checked={!!source.hidden}
-                            onChange={() =>
-                                dispatch(
-                                    updateSource({
-                                        ...source,
-                                        hidden: !source.hidden,
-                                    })
-                                )
-                            }
+                            onChange={() => save({ hidden: !source.hidden })}
                         />
                     </div>
                     <div className={classes.statusRow}>

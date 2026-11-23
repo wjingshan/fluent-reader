@@ -73,13 +73,28 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
         }
     }
 
+    const save = (patch: Partial<RSSSource>) => {
+        dispatch(updateSource({ ...source, ...patch })).catch(err =>
+            window.utils.showErrorBox(
+                intl.get("settings.writeError"),
+                String(err)
+            )
+        )
+    }
+
     const commitName = () => {
         const next = name.trim()
         if (!next || next === source.name) {
             setName(source.name || "")
             return
         }
-        dispatch(updateSource({ ...source, name: next }))
+        dispatch(updateSource({ ...source, name: next })).catch(err => {
+            setName(source.name || "")
+            window.utils.showErrorBox(
+                intl.get("settings.writeError"),
+                String(err)
+            )
+        })
     }
 
     const commitUrl = () => {
@@ -94,25 +109,26 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
             )
             return
         }
-        dispatch(updateSource({ ...source, url: next })).catch(err =>
+        dispatch(updateSource({ ...source, url: next })).catch(err => {
+            setFeedUrl(source.url || "")
             window.utils.showErrorBox(
                 intl.get("settings.writeError"),
                 String(err)
             )
-        )
+        })
     }
 
     const commitFrequency = (value: string) => {
         const next = parseInt(value)
         if (next !== source.fetchFrequency) {
-            dispatch(updateSource({ ...source, fetchFrequency: next }))
+            save({ fetchFrequency: next })
         }
     }
 
     const commitOpenTarget = (value: string) => {
         const next = parseInt(value) as SourceOpenTarget
         if (next !== source.openTarget) {
-            dispatch(updateSource({ ...source, openTarget: next }))
+            save({ openTarget: next })
         }
     }
 
@@ -240,11 +256,16 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                         </span>
                         <Input
                             className={classes.control}
+                            placeholder={intl.get("sources.name")}
                             value={name}
                             onChange={(_, data) => setName(data.value)}
                             onBlur={commitName}
                             onKeyDown={event => {
                                 if (event.key === "Enter") commitName()
+                                if (event.key === "Escape") {
+                                    event.stopPropagation()
+                                    setName(source.name || "")
+                                }
                             }}
                         />
                     </div>
@@ -252,11 +273,16 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                         <span className={classes.fieldLabel}>URL</span>
                         <Input
                             className={classes.control}
+                            placeholder="https://"
                             value={feedUrl}
                             onChange={(_, data) => setFeedUrl(data.value)}
                             onBlur={commitUrl}
                             onKeyDown={event => {
                                 if (event.key === "Enter") commitUrl()
+                                if (event.key === "Escape") {
+                                    event.stopPropagation()
+                                    setFeedUrl(source.url || "")
+                                }
                             }}
                         />
                     </div>
@@ -301,6 +327,9 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                                 ))}
                         </Dropdown>
                     </div>
+                    <span className={classes.notice}>
+                        {intl.get("subs.editHint")}
+                    </span>
                 </div>
                 <div className={classes.section}>
                     <div className={classes.fieldRow}>
@@ -381,14 +410,7 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                         </span>
                         <Switch
                             checked={!!source.hidden}
-                            onChange={() =>
-                                dispatch(
-                                    updateSource({
-                                        ...source,
-                                        hidden: !source.hidden,
-                                    })
-                                )
-                            }
+                            onChange={() => save({ hidden: !source.hidden })}
                         />
                     </div>
                 </div>

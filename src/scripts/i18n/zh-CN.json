@@ -446,6 +446,7 @@
         "selectionHiddenMixed": "其中 {count} 个已隐藏",
         "selectionApplied": "已应用设置到 {count} 个订阅源",
         "selectionAppliedPartial": "已应用 {count} 个，{failed} 个失败",
+        "editHint": "名称、URL、分组改完按回车或点别处即保存。",
         "selectionLatest": "最近更新",
         "selectionOldest": "最早更新",
         "selectionHint": "修改会立即应用到勾选的订阅源，可撤销。"
