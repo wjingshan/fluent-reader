@@ -207,6 +207,14 @@ function ItemContextMenu() {
                 globalThis.utils.writeClipboard(item.link)
             },
         },
+        {
+            key: "sourceSettings",
+            text: intl.get("context.sourceSettings"),
+            iconProps: { iconName: "Edit" },
+            onClick: () => {
+                dispatch(openSourceDialog(item.source))
+            },
+        },
         ...(viewConfigs === undefined
             ? []
             : [
