@@ -246,13 +246,41 @@ export const Menu: React.FC = () => {
         previousDisplayRef.current = display
     }, [display])
 
+    // Two feeds can share a display name (a site's own feed and a proxied copy
+    // of it). Showing their host lets the sidebar tell them apart.
+    const duplicateNames = useMemo(() => {
+        const counts = new Map<string, number>()
+        for (const source of Object.values(sources)) {
+            const name = (source.name || "").trim()
+            if (!name) continue
+            counts.set(name, (counts.get(name) || 0) + 1)
+        }
+        const dup = new Set<string>()
+        counts.forEach((count, name) => {
+            if (count > 1) dup.add(name)
+        })
+        return dup
+    }, [sources])
+
+    const hostOf = (url: string) => {
+        try {
+            return new URL(url).host
+        } catch {
+            return ""
+        }
+    }
+
     const renderSourceItem = (s: RSSSource) => {
         const key = "s-" + s.sid
+        const suffix = duplicateNames.has((s.name || "").trim())
+            ? hostOf(s.url || "")
+            : undefined
         return (
             <MenuTreeItem
                 key={key}
                 value={key}
                 label={s.name}
+                suffix={suffix}
                 isSelected={selected === key}
                 icon={
                     s.iconurl ? (
@@ -517,12 +545,23 @@ const useTreeItemClasses = makeStyles({
         opacity: 0.75,
         fontSize: "12px",
     },
+    nameSuffix: {
+        color: tokens.colorNeutralForeground4,
+        fontSize: "11px",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: "96px",
+    },
 })
 
 interface MenuTreeItemProps {
     value: string
     itemType?: "leaf" | "branch"
     label: string
+    // Extra grey text after the label, used to tell sources with the same name
+    // apart (for example a proxied feed and the site's own feed).
+    suffix?: string
     isSelected?: boolean
     icon?: React.ReactElement
     unreadCount?: number
@@ -538,6 +577,7 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
     value,
     itemType = "leaf",
     label,
+    suffix,
     isSelected = false,
     icon,
     unreadCount,
@@ -556,9 +596,13 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
             </span>
         ) : undefined
     let resolvedAside: React.ReactElement | undefined = aside
-    if (resolvedAside === undefined && (viewType !== undefined || count)) {
+    if (
+        resolvedAside === undefined &&
+        (viewType !== undefined || count || suffix)
+    ) {
         resolvedAside = (
             <span className={c.asideGroup}>
+                {suffix ? <span className={c.nameSuffix}>{suffix}</span> : null}
                 {viewType !== undefined ? (
                     <span
                         className={c.viewBadge}
@@ -584,7 +628,9 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
             onClick={onClick}
             onContextMenu={handleContextMenu}>
             <TreeItemLayout
-                aria-label={`${isSelected ? "Selected: " : ""}${label}`}
+                aria-label={`${isSelected ? "Selected: " : ""}${label}${
+                    suffix ? ` (${suffix})` : ""
+                }`}
                 className={mergeClasses(
                     c.treeItem,
                     itemType === "leaf" && c.treeLeafItem,
