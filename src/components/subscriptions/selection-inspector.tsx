@@ -15,7 +15,8 @@ import { useAppDispatch } from "../../scripts/reducer"
 import {
     RSSSource,
     SourceOpenTarget,
-    updateSource,
+    SourceFieldPatch,
+    updateSourcesPatch,
 } from "../../scripts/models/source"
 import { SourceGroup } from "../../schema-types"
 import { useManagerStyles } from "./styles"
@@ -36,9 +37,7 @@ export interface SelectionInspectorProps {
     onRefresh: () => void
 }
 
-type BulkPatch = Partial<
-    Pick<RSSSource, "openTarget" | "fetchFrequency" | "hidden">
->
+type BulkPatch = SourceFieldPatch
 
 const openTargetLabel = (target: SourceOpenTarget) =>
     ({
@@ -119,24 +118,29 @@ const SelectionInspector: React.FC<SelectionInspectorProps> = props => {
     const allHidden = sources.every(source => Boolean(source.hidden))
     const someHidden = sources.some(source => Boolean(source.hidden))
 
-    const apply = async (patch: BulkPatch, message: string) => {
+    const apply = async (patch: BulkPatch) => {
         if (applying) return
         setApplying(true)
+        const sids = sources.map(source => source.sid)
         const before = sources.map(source => ({
-            source,
+            sid: source.sid,
             openTarget: source.openTarget,
             fetchFrequency: source.fetchFrequency || 0,
             hidden: Boolean(source.hidden),
         }))
         try {
-            for (const source of sources) {
-                await dispatch(updateSource({ ...source, ...patch }))
-            }
+            const applied = await dispatch(updateSourcesPatch(sids, patch))
+            const message =
+                applied === sids.length
+                    ? intl.get("subs.selectionApplied", { count: applied })
+                    : intl.get("subs.selectionAppliedPartial", {
+                          count: applied,
+                          failed: sids.length - applied,
+                      })
             onToast(message, () => {
                 for (const entry of before) {
                     void dispatch(
-                        updateSource({
-                            ...entry.source,
+                        updateSourcesPatch([entry.sid], {
                             openTarget: entry.openTarget,
                             fetchFrequency: entry.fetchFrequency,
                             hidden: entry.hidden,
@@ -148,10 +152,6 @@ const SelectionInspector: React.FC<SelectionInspectorProps> = props => {
             setApplying(false)
         }
     }
-
-    const appliedMessage = intl.get("subs.selectionApplied", {
-        count: sources.length,
-    })
 
     return (
         <div className={mergeClasses(m.pane, m.inspectorPane)}>
@@ -332,10 +332,7 @@ const SelectionInspector: React.FC<SelectionInspectorProps> = props => {
                                 const target = Number(
                                     data.optionValue
                                 ) as SourceOpenTarget
-                                void apply(
-                                    { openTarget: target },
-                                    appliedMessage
-                                )
+                                void apply({ openTarget: target })
                             }}>
                             {[
                                 SourceOpenTarget.Local,
@@ -371,10 +368,7 @@ const SelectionInspector: React.FC<SelectionInspectorProps> = props => {
                             }
                             onOptionSelect={(_, data) => {
                                 const frequency = Number(data.optionValue) || 0
-                                void apply(
-                                    { fetchFrequency: frequency },
-                                    appliedMessage
-                                )
+                                void apply({ fetchFrequency: frequency })
                             }}>
                             {FREQUENCY_OPTIONS.map(f => (
                                 <Option
@@ -394,10 +388,7 @@ const SelectionInspector: React.FC<SelectionInspectorProps> = props => {
                             checked={allHidden}
                             disabled={applying}
                             onChange={(_, data) =>
-                                void apply(
-                                    { hidden: data.checked },
-                                    appliedMessage
-                                )
+                                void apply({ hidden: data.checked })
                             }
                         />
                     </div>

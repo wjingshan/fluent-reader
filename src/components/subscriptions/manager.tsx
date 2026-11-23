@@ -277,6 +277,19 @@ const SubscriptionManager: React.FC = () => {
         )
     }, [rows, selected.size])
 
+    // A selection only ever applies to rows the user can currently see. When
+    // the group filter or the search narrows the list, drop any selected sid
+    // that is no longer on screen — otherwise a bulk edit made in one group
+    // would also hit selections silently left over from another group.
+    useEffect(() => {
+        setSelected(prev => {
+            if (prev.size === 0) return prev
+            const onScreen = new Set(rows.map(row => row.source.sid))
+            const next = new Set([...prev].filter(sid => onScreen.has(sid)))
+            return next.size === prev.size ? prev : next
+        })
+    }, [rows])
+
     const counts = useMemo(() => {
         const visible = allSources.filter(source => !source.hidden)
         const byGid: Record<number, number> = {}
@@ -569,6 +582,18 @@ const SubscriptionManager: React.FC = () => {
 
     const selectedHiddenVisible = filterKey === "hidden"
 
+    // Extra reassurance for bulk edits: show how many groups the live selection
+    // spans, so a cross-group selection is visible before anything is applied.
+    const selectedGroupCount =
+        selected.size > 0
+            ? new Set(
+                  [...selected].map(sid => {
+                      const group = groupBySid.get(sid)
+                      return group ? `g${group.gid}` : "u"
+                  })
+              ).size
+            : 0
+
     return createPortal(
         <div className={classes.root}>
             <div className={classes.header}>
@@ -689,6 +714,11 @@ const SubscriptionManager: React.FC = () => {
                                 {intl.get("subs.selectedCount", {
                                     count: selected.size,
                                 })}
+                                {selectedGroupCount > 1
+                                    ? ` · ${intl.get("subs.selectedGroups", {
+                                          count: selectedGroupCount,
+                                      })}`
+                                    : ""}
                             </span>
                             {bulkNewGroup ? (
                                 <>

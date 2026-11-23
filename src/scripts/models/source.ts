@@ -1,6 +1,7 @@
 import { SourceGroup } from "../../schema-types"
 import intl from "react-intl-universal"
 import { eq, and, or, isNull, max, count } from "drizzle-orm"
+import type { BatchItem } from "drizzle-orm/batch"
 import { database, sourcesTable, itemsTable, init } from "../db"
 import { findValidDate } from "../date"
 import {
@@ -417,20 +418,24 @@ export function updateSourceDone(source: RSSSource): SourceActionTypes {
     }
 }
 
+function sourceDbValues(source: RSSSource) {
+    return {
+        sid: source.sid,
+        url: source.url,
+        iconurl: source.iconurl || null,
+        name: source.name,
+        openTarget: source.openTarget,
+        lastFetched: source.lastFetched,
+        serviceRef: source.serviceRef || null,
+        fetchFrequency: source.fetchFrequency || 0,
+        textDir: source.textDir || 0,
+        hidden: source.hidden || false,
+    }
+}
+
 export function updateSource(source: RSSSource): AppThunk<Promise<void>> {
     return async dispatch => {
-        const dbValues = {
-            sid: source.sid,
-            url: source.url,
-            iconurl: source.iconurl || null,
-            name: source.name,
-            openTarget: source.openTarget,
-            lastFetched: source.lastFetched,
-            serviceRef: source.serviceRef || null,
-            fetchFrequency: source.fetchFrequency || 0,
-            textDir: source.textDir || 0,
-            hidden: source.hidden || false,
-        }
+        const dbValues = sourceDbValues(source)
         await database
             .insert(sourcesTable)
             .values(dbValues)
@@ -439,6 +444,60 @@ export function updateSource(source: RSSSource): AppThunk<Promise<void>> {
                 set: dbValues,
             })
         dispatch(updateSourceDone(source))
+    }
+}
+
+export type SourceFieldPatch = Partial<
+    Pick<RSSSource, "openTarget" | "fetchFrequency" | "hidden">
+>
+
+/**
+ * Applies one patch to many sources. Reads each source from the current store
+ * instead of a render-time snapshot, so a field that a background fetch just
+ * updated (lastFetched) is not written back to an older value, and writes every
+ * row in a single atomic batch: either the whole edit lands or none of it does.
+ * Falls back to row-by-row writes only if the batch is rejected. Returns how
+ * many sources were written.
+ */
+export function updateSourcesPatch(
+    sids: number[],
+    patch: SourceFieldPatch
+): AppThunk<Promise<number>> {
+    return async (dispatch, getState) => {
+        const merged = sids
+            .map(sid => getState().sources[sid])
+            .filter(source => Boolean(source))
+            .map(source => ({ ...source, ...patch }) as RSSSource)
+        if (merged.length === 0) return 0
+        const values = merged.map(sourceDbValues)
+        try {
+            await database.batch(
+                values.map(dbValues =>
+                    database
+                        .insert(sourcesTable)
+                        .values(dbValues)
+                        .onConflictDoUpdate({
+                            target: sourcesTable.sid,
+                            set: dbValues,
+                        })
+                ) as unknown as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]
+            )
+            merged.forEach(source => dispatch(updateSourceDone(source)))
+            return merged.length
+        } catch (err) {
+            console.error("updateSourcesPatch batch failed, retrying row by row", err)
+        }
+        let applied = 0
+        for (const source of merged) {
+            try {
+                await dispatch(updateSource(source))
+                applied += 1
+            } catch (err) {
+                // Keep going: one bad row should not silently drop the rest.
+                console.error("updateSourcesPatch failed for", source.sid, err)
+            }
+        }
+        return applied
     }
 }
 

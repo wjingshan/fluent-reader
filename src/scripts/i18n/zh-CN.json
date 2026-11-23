@@ -376,6 +376,7 @@
         "justNow": "刚刚",
         "never": "从未抓取",
         "selectedCount": "已选 {count} 项",
+        "selectedGroups": "{count} 个分组",
         "moveTo": "移动到…",
         "bulkHide": "隐藏",
         "bulkShow": "显示",
@@ -444,6 +445,7 @@
         "selectionMixed": "多种值",
         "selectionHiddenMixed": "其中 {count} 个已隐藏",
         "selectionApplied": "已应用设置到 {count} 个订阅源",
+        "selectionAppliedPartial": "已应用 {count} 个，{failed} 个失败",
         "selectionLatest": "最近更新",
         "selectionOldest": "最早更新",
         "selectionHint": "修改会立即应用到勾选的订阅源，可撤销。"

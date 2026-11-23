@@ -378,6 +378,7 @@
         "justNow": "just now",
         "never": "Never fetched",
         "selectedCount": "{count} selected",
+        "selectedGroups": "{count} groups",
         "moveTo": "Move to…",
         "bulkHide": "Hide",
         "bulkShow": "Show",
@@ -446,6 +447,7 @@
         "selectionMixed": "Mixed values",
         "selectionHiddenMixed": "{count} of them are hidden",
         "selectionApplied": "Applied to {count} sources",
+        "selectionAppliedPartial": "Applied to {count}, {failed} failed",
         "selectionLatest": "Newest update",
         "selectionOldest": "Oldest update",
         "selectionHint": "Changes apply to the selected sources right away and can be undone."
