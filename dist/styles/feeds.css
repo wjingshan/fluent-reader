@@ -12,10 +12,14 @@
     overflow: hidden scroll;
     margin-top: var(--navHeight);
 }
+/* The cells must fill the page width: with centring here the cell shrinks to
+   its content, so a feed holding a single article got a narrow card and the
+   left/right inset stopped working altogether. The card centres itself instead,
+   see the magazine card styles. */
 .magazine-feed .ms-List-page {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
 }
 
 .cards-feed-container {

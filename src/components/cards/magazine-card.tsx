@@ -19,6 +19,11 @@ const useStyles = makeStyles({
         // reading width on a wide screen. The old fixed 700px cap is gone on
         // purpose — it made every inset value a no-op on a wide window.
         "width": "calc(100% - 2 * var(--fr-magazine-inset, 0px))",
+        // The cell is now full width, so the card centres itself and the inset
+        // ends up equal on both sides. Without this the inset only showed on
+        // the right, with the card glued to the left edge.
+        "marginLeft": "auto",
+        "marginRight": "auto",
         // The static sheet leaves the card content-box, so a percentage width
         // plus 48px of padding would overflow the window by exactly the padding
         // and push the centring off by half of it.
