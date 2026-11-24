@@ -167,6 +167,27 @@ export const cutText = (s: string, length: number) => {
     return s.length <= length ? s : s.slice(0, length) + "…"
 }
 
+// A feed address is rarely a page anyone wants to visit: feeds usually sit at
+// /feed or /rss, or as a *.xml file below the real page. Strip that last segment
+// so the menu can open the site itself. Local feed proxies have no public site
+// of their own, so they fall back to their origin.
+export function sourceSiteUrl(feedUrl: string): string {
+    try {
+        const url = new URL(feedUrl)
+        if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname)) {
+            return url.origin + "/"
+        }
+        let path = url.pathname.replace(
+            /(?:^|\/)(?:feed|feeds|rss|atom|index\.xml|feed\.xml|rss\.xml|atom\.xml|[^/]+\.(?:xml|atom|rss|json))\/?$/i,
+            ""
+        )
+        path = path.replace(/\/+$/, "")
+        return url.origin + path + "/"
+    } catch {
+        return ""
+    }
+}
+
 export function getSearchEngineName(engine: SearchEngines) {
     switch (engine) {
         case SearchEngines.Google:

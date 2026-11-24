@@ -6,6 +6,7 @@ import {
     webSearch,
     getSearchEngineName,
     platformCtrl,
+    sourceSiteUrl,
 } from "../scripts/utils"
 import {
     ContextualMenu,
@@ -535,6 +536,7 @@ function GroupContextMenu() {
     ) as number[]
     const menuKey = useAppSelector(state => state.app.contextMenu.menuKey)
     const groupViews = useAppSelector(state => state.page.groupViews)
+    const sources = useAppSelector(state => state.sources)
     const hasOwnView = Boolean(menuKey && groupViews[menuKey] !== undefined)
 
     const menuItems: IContextualMenuItem[] = [
@@ -552,6 +554,16 @@ function GroupContextMenu() {
             iconProps: { iconName: "Sync" },
             onClick: () => {
                 dispatch(fetchItems(false, sids))
+            },
+        },
+        {
+            key: "openSourceSite",
+            text: intl.get("context.openSourceSite"),
+            iconProps: { iconName: "NavigateExternalInline" },
+            onClick: () => {
+                const source = sids.length === 1 ? sources[sids[0]] : undefined
+                const site = source ? sourceSiteUrl(source.url) : ""
+                if (site) globalThis.utils.openExternal(site)
             },
         },
         {
@@ -576,10 +588,11 @@ function GroupContextMenu() {
             },
         },
     ]
-    // Editing one source is only offered for that single source, not for a
-    // group selection.
+    // Opening the site and editing it are per-source actions, so a group
+    // selection drops both of them.
     if (sids.length !== 1) {
-        menuItems.splice(menuItems.length - 2, 1)
+        const at = menuItems.findIndex(item => item.key === "openSourceSite")
+        if (at >= 0) menuItems.splice(at, 2)
     }
     if (hasOwnView) {
         menuItems.push({
