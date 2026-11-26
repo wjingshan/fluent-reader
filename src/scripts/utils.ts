@@ -200,8 +200,38 @@ export function getSearchEngineName(engine: SearchEngines) {
             return intl.get("searchEngine.duckduckgo")
     }
 }
-export function webSearch(text: string, engine = SearchEngines.Google) {
-    switch (engine) {
+// ---------------------------------------------------------------- open external
+//
+// A source can be pinned to a specific browser, so every place that opens a
+// link on the user's behalf goes through these helpers instead of calling the
+// bridge directly. The map is cached because it only changes on user edits.
+
+let sourceBrowsersCache: Record<string, string> | null = null
+
+export function sourceBrowserMap(): Record<string, string> {
+    if (!sourceBrowsersCache)
+        sourceBrowsersCache = window.utils.getSourceBrowsers() || {}
+    return sourceBrowsersCache
+}
+
+export function invalidateSourceBrowserMap() {
+    sourceBrowsersCache = null
+}
+
+export function browserForSource(sid?: number): string {
+    if (sid == null) return "default"
+    return sourceBrowserMap()[String(sid)] || "default"
+}
+
+export function openExternalForSource(
+    url: string,
+    sid?: number,
+    background = false
+) {
+    window.utils.openExternal(url, background, browserForSource(sid))
+}
+
+export function webSearch(text: string, engine = SearchEngines.Google) {    switch (engine) {
         case SearchEngines.Google:
             return window.utils.openExternal(
                 "https://www.google.com/search?q=" + encodeURIComponent(text)

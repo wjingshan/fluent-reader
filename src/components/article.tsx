@@ -30,7 +30,7 @@ import {
     SourceTextDirection,
 } from "../scripts/models/source"
 import { shareSubmenu } from "./context-menu"
-import { platformCtrl } from "../scripts/utils"
+import { openExternalForSource, platformCtrl } from "../scripts/utils"
 import { Spinner } from "@fluentui/react-components"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
 import { dismissItem, showOffsetItem } from "../scripts/models/page"
@@ -241,6 +241,31 @@ function Article({ itemId, side = false }: ArticleProps) {
         if (!loaded) appliedBody.current = "original"
     }, [loaded])
 
+    // Which source this article belongs to decides which browser its links go
+    // to. The guest webview cannot report that itself, so the source is pushed
+    // to the main process whenever the article (re)loads, and published on the
+    // body so the in-article text menu follows the same choice.
+    useEffect(() => {
+        document.body.dataset.frArticleSid = String(item.source)
+        return () => {
+            delete document.body.dataset.frArticleSid
+        }
+    }, [item.source])
+
+    useEffect(() => {
+        const node = webview.current as unknown as {
+            getWebContentsId?: () => number
+        } | null
+        if (!node || typeof node.getWebContentsId !== "function") return
+        try {
+            const id = node.getWebContentsId()
+            if (Number.isSafeInteger(id))
+                window.utils.setWebviewSource(id, item.source)
+        } catch (err) {
+            // the guest is not attached yet; dom-ready will run this again
+        }
+    }, [loaded, item.source, item.link, webviewKey])
+
     // A cached translation is re-applied whenever the guest finishes loading,
     // which is what makes the result survive closing and reopening the article.
     useEffect(() => {
@@ -363,7 +388,11 @@ function Article({ itemId, side = false }: ArticleProps) {
                 text: intl.get("openExternal"),
                 iconProps: { iconName: "NavigateExternalInline" },
                 onClick: e => {
-                    window.utils.openExternal(item.link, platformCtrl(e))
+                    openExternalForSource(
+                        item.link,
+                        item.source,
+                        platformCtrl(e)
+                    )
                 },
             },
             {

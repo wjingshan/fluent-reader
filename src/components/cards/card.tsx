@@ -1,7 +1,7 @@
 import * as React from "react"
 import { RSSSource, SourceOpenTarget } from "../../scripts/models/source"
 import { RSSItem } from "../../scripts/models/item"
-import { platformCtrl } from "../../scripts/utils"
+import { platformCtrl, openExternalForSource } from "../../scripts/utils"
 import { FeedFilter } from "../../scripts/models/feed"
 import { ViewConfigs } from "../../schema-types"
 
@@ -21,7 +21,11 @@ export namespace Card {
 
     const openInBrowser = (props: Props, e: React.MouseEvent) => {
         props.markRead(props.item)
-        window.utils.openExternal(props.item.link, platformCtrl(e))
+        openExternalForSource(
+            props.item.link,
+            props.item.source,
+            platformCtrl(e)
+        )
     }
 
     export const bindEventsToProps = (props: Props) => ({

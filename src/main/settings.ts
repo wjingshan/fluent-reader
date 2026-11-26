@@ -19,7 +19,7 @@ import {
 } from "../schema-types"
 import { ipcMain, session, nativeTheme, app } from "electron"
 import { WindowManager } from "./window"
-import { transformLovefieldRules } from "./utils"
+import { rememberSourceBrowser, transformLovefieldRules } from "./utils"
 export const store = new Store<SchemaTypes>({ cache: true })
 
 const GROUPS_STORE_KEY = "sourceGroups"
@@ -348,4 +348,26 @@ ipcMain.on("get-layout-config", event => {
 })
 ipcMain.handle("set-layout-config", (_, config: LayoutConfig) => {
     store.set(LAYOUT_CONFIG_STORE_KEY, normalizeLayoutConfig(config))
+})
+
+// Which external browser opens a source's links. Keyed by sid so it lives
+// outside the feed database and needs no migration; "default" (or a missing
+// key) means the system browser.
+const SOURCE_BROWSERS_STORE_KEY = "sourceBrowsers"
+ipcMain.on("get-source-browsers", event => {
+    const browsers = store.get(SOURCE_BROWSERS_STORE_KEY, {})
+    // Keep the main process copy warm: an article webview resolves its browser
+    // through this map when a link is opened, without asking the renderer.
+    for (const [sid, browser] of Object.entries(browsers))
+        rememberSourceBrowser(Number(sid), browser)
+    event.returnValue = browsers
+})
+ipcMain.handle("set-source-browser", (_, sid: number, browser: string) => {
+    const current = store.get(SOURCE_BROWSERS_STORE_KEY, {})
+    const next: Record<string, string> = { ...current }
+    const key = String(sid)
+    if (browser && browser !== "default") next[key] = browser
+    else delete next[key]
+    store.set(SOURCE_BROWSERS_STORE_KEY, next)
+    rememberSourceBrowser(sid, browser)
 })

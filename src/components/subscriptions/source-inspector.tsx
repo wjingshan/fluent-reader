@@ -11,7 +11,11 @@ import {
     mergeClasses,
 } from "@fluentui/react-components"
 import { useAppDispatch } from "../../scripts/reducer"
-import { urlTest } from "../../scripts/utils"
+import {
+    urlTest,
+    invalidateSourceBrowserMap,
+    sourceBrowserMap,
+} from "../../scripts/utils"
 import {
     RSSSource,
     SourceOpenTarget,
@@ -23,7 +27,7 @@ import {
     removeSourceFromGroup,
 } from "../../scripts/models/group"
 import { fetchItems } from "../../scripts/models/item"
-import { SourceGroup } from "../../schema-types"
+import { SourceGroup, BrowserOption } from "../../schema-types"
 import { useManagerStyles } from "./styles"
 import {
     FREQUENCY_OPTIONS,
@@ -53,10 +57,23 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
     const [name, setName] = useState(source.name || "")
     const [feedUrl, setFeedUrl] = useState(source.url || "")
     const [retrying, setRetrying] = useState(false)
+    const [browsers, setBrowsers] = useState<BrowserOption[]>([])
+    const [sourceBrowser, setSourceBrowser] = useState("default")
+
+    useEffect(() => {
+        let live = true
+        window.utils.getBrowsers().then(list => {
+            if (live) setBrowsers(list || [])
+        })
+        return () => {
+            live = false
+        }
+    }, [])
 
     useEffect(() => {
         setName(source.name || "")
         setFeedUrl(source.url || "")
+        setSourceBrowser(sourceBrowserMap()[String(source.sid)] || "default")
     }, [source.sid])
 
     const group = groupOf(groups, source.sid)
@@ -130,6 +147,30 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
         if (next !== source.openTarget) {
             save({ openTarget: next })
         }
+    }
+
+    const commitBrowser = (value: string) => {
+        if (value === sourceBrowser) return
+        setSourceBrowser(value)
+        window.utils
+            .setSourceBrowser(source.sid, value)
+            .then(() => invalidateSourceBrowserMap())
+            .catch(err =>
+                window.utils.showErrorBox(
+                    intl.get("settings.writeError"),
+                    String(err)
+                )
+            )
+    }
+
+    // A browser that is not probed any more (uninstalled, or a hand-typed
+    // path) still needs a label, otherwise the dropdown shows a raw id.
+    const browserLabel = (value: string) => {
+        if (value === "default") return intl.get("subs.browserSystem")
+        return (
+            browsers.find(b => b.id === value)?.name ||
+            intl.get("subs.browserCustom")
+        )
     }
 
     const moveToGroup = (value: string) => {
@@ -375,6 +416,37 @@ const SourceInspector: React.FC<SourceInspectorProps> = props => {
                                 text={intl.get("openExternal")}>
                                 {intl.get("openExternal")}
                             </Option>
+                        </Dropdown>
+                    </div>
+                    <div className={classes.fieldRow}>
+                        <span className={classes.fieldLabel}>
+                            {intl.get("subs.browser")}
+                        </span>
+                        <Dropdown
+                            className={classes.control}
+                            value={browserLabel(sourceBrowser)}
+                            selectedOptions={[sourceBrowser]}
+                            onOptionSelect={(_, data) =>
+                                commitBrowser(data.optionValue as string)
+                            }>
+                            <Option
+                                value="default"
+                                text={intl.get("subs.browserSystem")}>
+                                {intl.get("subs.browserSystem")}
+                            </Option>
+                            {browsers.map(b => (
+                                <Option key={b.id} value={b.id} text={b.name}>
+                                    {b.name}
+                                </Option>
+                            ))}
+                            {sourceBrowser !== "default" &&
+                                !browsers.some(b => b.id === sourceBrowser) && (
+                                    <Option
+                                        value={sourceBrowser}
+                                        text={browserLabel(sourceBrowser)}>
+                                        {browserLabel(sourceBrowser)}
+                                    </Option>
+                                )}
                         </Dropdown>
                     </div>
                     {!source.serviceRef && (

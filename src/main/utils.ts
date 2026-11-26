@@ -1,9 +1,29 @@
 import { ipcMain, shell, dialog, app, session, clipboard } from "electron"
 import { WindowManager } from "./window"
 import * as fs from "node:fs"
+import { spawn } from "node:child_process"
 import { ImageCallbackTypes, StoredRules, TouchBarTexts } from "../schema-types"
 import { initMainTouchBar } from "./touchbar"
 import * as fontList from "font-list"
+
+// Which source each article webview is showing, and the browser the user
+// picked for that source. An article's guest hands its links to the main
+// process, which cannot tell which source it belongs to, so the renderer
+// registers it here. The choice is kept separately from the sid so a settings
+// change applies to the article already on screen, not only to the next one.
+const webviewSources = new Map<number, number>()
+const sourceBrowserPrefs = new Map<number, string>()
+
+export function rememberSourceBrowser(sid: number, browser: string) {
+    if (!Number.isSafeInteger(sid)) return
+    if (browser && browser !== "default") sourceBrowserPrefs.set(sid, browser)
+    else sourceBrowserPrefs.delete(sid)
+}
+
+function sourceBrowserFor(sid?: number): string {
+    if (sid == null) return "default"
+    return sourceBrowserPrefs.get(sid) || "default"
+}
 
 const webviewInputFocused = `(() => {
     let element = document.activeElement
@@ -16,7 +36,101 @@ const webviewInputFocused = `(() => {
 })()`
 
 export function setUtilsListeners(manager: WindowManager) {
-    async function openExternal(url: string, background = false) {
+    // A browser the app does not own gets started with the URL as its argument.
+    // Probing is lazy and cached: the set does not change while the app runs.
+    interface BrowserDef {
+        id: string
+        name: string
+        win: string[]
+        mac: string[]
+    }
+    const BROWSER_DEFS: BrowserDef[] = [
+        {
+            id: "edge",
+            name: "Microsoft Edge",
+            win: [
+                "%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe",
+                "%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe",
+            ],
+            mac: [
+                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            ],
+        },
+        {
+            id: "chrome",
+            name: "Google Chrome",
+            win: [
+                "%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe",
+                "%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe",
+                "%LOCALAPPDATA%\\Google\\Chrome\\Application\\chrome.exe",
+            ],
+            mac: [
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            ],
+        },
+        {
+            id: "firefox",
+            name: "Mozilla Firefox",
+            win: [
+                "%ProgramFiles%\\Mozilla Firefox\\firefox.exe",
+                "%ProgramFiles(x86)%\\Mozilla Firefox\\firefox.exe",
+            ],
+            mac: [
+                "/Applications/Firefox.app/Contents/MacOS/firefox",
+            ],
+        },
+    ]
+
+    const expandEnv = (value: string) =>
+        value.replace(/%([^%]+)%/g, (_, name) => process.env[name] ?? "")
+
+    let browserCache: Array<{ id: string; name: string; path: string }> | null =
+        null
+
+    function listBrowsers() {
+        if (browserCache) return browserCache
+        const found: Array<{ id: string; name: string; path: string }> = []
+        for (const def of BROWSER_DEFS) {
+            const candidates =
+                process.platform === "darwin" ? def.mac : def.win
+            const path = candidates
+                .map(expandEnv)
+                .find(candidate => candidate && fs.existsSync(candidate))
+            if (path) found.push({ id: def.id, name: def.name, path })
+        }
+        browserCache = found
+        return found
+    }
+
+    // Accepts a browser id from the list, or an absolute executable path so a
+    // browser we do not probe can still be chosen by hand.
+    function browserPath(idOrPath?: string): string | null {
+        if (!idOrPath || idOrPath === "default") return null
+        if (/[\\/]/.test(idOrPath))
+            return fs.existsSync(idOrPath) ? idOrPath : null
+        return listBrowsers().find(browser => browser.id === idOrPath)?.path ?? null
+    }
+
+    function launchBrowser(path: string, url: string) {
+        try {
+            const child = spawn(path, [url], { detached: true, stdio: "ignore" })
+            child.on("error", () => {})
+            child.unref()
+            return true
+        } catch (err) {
+            return false
+        }
+    }
+
+    // Which source an article's guest belongs to. The guest itself has no idea,
+    // so the renderer registers it per webview.
+    async function openExternal(
+        url: string,
+        background = false,
+        browser?: string
+    ) {
+        const exe = browserPath(browser)
+        if (exe && launchBrowser(exe, url)) return
         if (url.startsWith("https://") || url.startsWith("http://")) {
             if (background && process.platform === "darwin") {
                 shell.openExternal(url, { activate: false })
@@ -45,7 +159,8 @@ export function setUtilsListeners(manager: WindowManager) {
             if (contents.getType() === "webview")
                 openExternal(
                     details.url,
-                    details.disposition === "background-tab"
+                    details.disposition === "background-tab",
+                    sourceBrowserFor(webviewSources.get(contents.id))
                 )
             return {
                 action: manager.hasWindow() ? "deny" : "allow",
@@ -53,7 +168,15 @@ export function setUtilsListeners(manager: WindowManager) {
         })
         contents.on("will-navigate", (event, url) => {
             event.preventDefault()
-            if (contents.getType() === "webview") openExternal(url)
+            if (contents.getType() === "webview")
+                openExternal(
+                    url,
+                    false,
+                    sourceBrowserFor(webviewSources.get(contents.id))
+                )
+        })
+        contents.once("destroyed", () => {
+            webviewSources.delete(contents.id)
         })
     })
 
@@ -61,9 +184,20 @@ export function setUtilsListeners(manager: WindowManager) {
         event.returnValue = app.getVersion()
     })
 
-    ipcMain.handle("open-external", (_, url: string, background: boolean) => {
-        openExternal(url, background)
+    ipcMain.handle("get-browsers", () => listBrowsers())
+
+    ipcMain.on("set-webview-source", (_, webContentsId: number, sid: number) => {
+        if (!Number.isSafeInteger(webContentsId)) return
+        if (Number.isSafeInteger(sid)) webviewSources.set(webContentsId, sid)
+        else webviewSources.delete(webContentsId)
     })
+
+    ipcMain.handle(
+        "open-external",
+        (_, url: string, background: boolean, browser?: string) => {
+            openExternal(url, background, browser)
+        }
+    )
 
     ipcMain.handle(
         "show-error-box",

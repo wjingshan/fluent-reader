@@ -1,5 +1,6 @@
 import { ipcRenderer } from "electron"
 import {
+    BrowserOption,
     ImageCallbackTypes,
     TouchBarTexts,
     WindowStateListenerType,
@@ -13,8 +14,25 @@ const utilsBridge = {
         return ipcRenderer.sendSync("get-version")
     },
 
-    openExternal: (url: string, background = false) => {
-        ipcRenderer.invoke("open-external", url, background)
+    // `browser` is a browser id from getBrowsers(), an absolute executable
+    // path, or "default" for the system browser.
+    openExternal: (url: string, background = false, browser = "default") => {
+        ipcRenderer.invoke("open-external", url, background, browser)
+    },
+
+    getBrowsers: (): Promise<Array<BrowserOption>> =>
+        ipcRenderer.invoke("get-browsers"),
+
+    getSourceBrowsers: (): Record<string, string> =>
+        ipcRenderer.sendSync("get-source-browsers"),
+
+    setSourceBrowser: (sid: number, browser: string): Promise<void> =>
+        ipcRenderer.invoke("set-source-browser", sid, browser),
+
+    // Tells the main process which source this guest is showing; a webview
+    // has no idea itself, and the source decides which browser links go to.
+    setWebviewSource: (webContentsId: number, sid: number) => {
+        ipcRenderer.send("set-webview-source", webContentsId, sid)
     },
 
     showErrorBox: (title: string, content: string, copy?: string) => {

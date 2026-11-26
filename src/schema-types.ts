@@ -310,6 +310,13 @@ export interface TranslationKeyState {
     fromEnvironment: boolean
 }
 
+// A browser the app can start directly, so a source can be pinned to it.
+export interface BrowserOption {
+    id: string
+    name: string
+    path: string
+}
+
 export type SchemaTypes = {
     version: string
     theme: ThemeSettings
@@ -342,4 +349,7 @@ export type SchemaTypes = {
     translateApiKey: string
     // Card-list display metrics (see layout.ts / components/settings/layout).
     layoutConfig: LayoutConfig
+    // Per-source external browser: sid -> browser id from get-browsers.
+    // A missing key means the system browser.
+    sourceBrowsers: Record<string, string>
 }

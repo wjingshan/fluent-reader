@@ -10,6 +10,7 @@ import {
     htmlDecode,
     ActionStatus,
     AppThunk,
+    openExternalForSource,
     platformCtrl,
 } from "../utils"
 import { RSSSource, updateSource, updateUnreadCounts } from "./source"
@@ -697,7 +698,7 @@ export function itemShortcuts(item: RSSItem, e: KeyboardEvent): AppThunk {
             case "b":
             case "B":
                 if (!item.hasRead) dispatch(markRead(item))
-                window.utils.openExternal(item.link, platformCtrl(e))
+                openExternalForSource(item.link, item.source, platformCtrl(e))
                 break
             case "s":
             case "S":

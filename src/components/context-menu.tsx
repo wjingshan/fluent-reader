@@ -5,6 +5,7 @@ import {
     cutText,
     webSearch,
     getSearchEngineName,
+    openExternalForSource,
     platformCtrl,
     sourceSiteUrl,
 } from "../scripts/utils"
@@ -109,7 +110,7 @@ function ItemContextMenu() {
             iconProps: { iconName: "NavigateExternalInline" },
             onClick: e => {
                 dispatch(markRead(item))
-                globalThis.utils.openExternal(item.link, platformCtrl(e))
+                openExternalForSource(item.link, item.source, platformCtrl(e))
             },
         },
         {
@@ -314,7 +315,16 @@ function TextContextMenu() {
                             iconName: "NavigateExternalInline",
                         },
                         onClick: e => {
-                            globalThis.utils.openExternal(url, platformCtrl(e))
+                            // The text menu lives inside an article, so the
+                            // article's own source decides the browser.
+                            const sid = Number(
+                                document.body.dataset.frArticleSid
+                            )
+                            openExternalForSource(
+                                url,
+                                Number.isSafeInteger(sid) ? sid : undefined,
+                                platformCtrl(e)
+                            )
                         },
                     },
                     {

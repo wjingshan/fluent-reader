@@ -15,6 +15,7 @@ import {
     AppThunk,
     getWindowBreakpoint,
     initTouchBarWithTexts,
+    openExternalForSource,
 } from "../utils"
 import { INIT_FEEDS, FeedActionTypes, ALL, initFeeds } from "./feed"
 import {
@@ -555,7 +556,7 @@ export function pushNotification(item: RSSItem): AppThunk {
                     state.sources[item.source].openTarget ===
                     SourceOpenTarget.External
                 ) {
-                    window.utils.openExternal(item.link)
+                    openExternalForSource(item.link, item.source)
                 } else if (!state.app.settings.display) {
                     window.utils.focus()
                     dispatch(showItemFromId(item._id))

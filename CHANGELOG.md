@@ -2,6 +2,29 @@
 
 个人增强分支：`feat/subscription-manager`（基于上游 `yang991178/fluent-reader`）。
 
+## v1.5.0-wj.1 — 2026-11-26
+
+每个订阅源可以单独指定用哪个浏览器打开链接。默认仍跟随系统浏览器，所以老数据不需要迁移。
+
+### 新增
+
+- **每源外部浏览器**：单源设置（弹窗与订阅管理检查器）新增「外部浏览器」下拉，可选「跟随系统默认」或本机已安装的浏览器（自动探测 Microsoft Edge / Google Chrome / Mozilla Firefox，未安装的不列出）。选择即时保存。
+- 该选择覆盖所有"替用户打开链接"的入口：文章工具栏「更多」里的打开原文、文章右键菜单、卡片打开、快捷键 `b`、通知点击，以及正文里点击/右键链接（正文所述 webview 会把自己的来源告诉主进程）。
+- 存储走 `electron-store` 的 `sourceBrowsers`（`sid → 浏览器 id`），不碰订阅数据库，因此无需 schema 迁移；删除该键即回到系统默认。
+- 非默认浏览器由主进程直接 `spawn(exe, [url])` 启动（分离进程、不占 stdio），启动失败回退到系统 `shell.openExternal`，不会因为浏览器路径失效而丢掉点击。
+
+### 实现要点
+
+- 浏览器探测与启动在 `src/main/utils.ts`（`listBrowsers` / `browserPath` 惰性缓存一次，`get-browsers` 供渲染层拉取）。
+- 正文 webview 无法自报所属源，因此文章加载时把 `getWebContentsId()` 与 sid 注册到主进程（`set-webview-source`）；`will-navigate` / `setWindowOpenHandler` 时主进程用 sid 现查浏览器，所以**改完设置对当前正打开的文章立即生效**，不需要重开文章。guest 销毁即清理。
+- 渲染层统一走 `openExternalForSource(url, sid)`（`src/scripts/utils.ts`），浏览器映射带缓存，用户改动后立即失效重读。
+- 正文内文字右键没有 item 上下文，改从 `document.body.dataset.frArticleSid`（由文章组件写入）取当前源。
+
+### 兼容
+
+- 未设置过的源（无 key）行为与之前完全一致：系统默认浏览器 + 原有的 `background`（后台新标签页时窗口临时置顶）逻辑不变。
+- `SchemaTypes` 新增 `BrowserOption` 与 `sourceBrowsers` 字段。
+
 ## v1.4.0-wj.1 — 2026-11-26
 
 上游基线 1.3.2。这一版把订阅管理从设置页里拆出来做成独立工作台，并修好视频型订阅源在瀑布流里"悬停不播放"的问题。
