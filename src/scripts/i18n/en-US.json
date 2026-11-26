@@ -52,7 +52,11 @@
     },
     "menu": {
         "close": "Close menu",
-        "subscriptions": "Subscriptions"
+        "subscriptions": "Subscriptions",
+        "refresh": "Refresh",
+        "refreshing": "Refreshing…",
+        "refreshedNoNew": "Refreshed — no new items yet",
+        "refreshFailed": "Refresh failed, try again later"
     },
     "article": {
         "error": "Failed to load article.",

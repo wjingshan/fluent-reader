@@ -52,7 +52,11 @@
     },
     "menu": {
         "close": "关闭菜单",
-        "subscriptions": "订阅源"
+        "subscriptions": "订阅源",
+        "refresh": "刷新",
+        "refreshing": "刷新中…",
+        "refreshedNoNew": "已刷新，暂时没有新的消息",
+        "refreshFailed": "刷新失败，稍后再试"
     },
     "article": {
         "error": "文章加载失败",

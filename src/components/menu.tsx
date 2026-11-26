@@ -4,9 +4,10 @@ import intl from "react-intl-universal"
 import { SourceGroup, ViewType } from "../schema-types"
 import { RSSSource } from "../scripts/models/source"
 import { ALL, initFeeds } from "../scripts/models/feed"
-import { useAppSelector, useAppDispatch } from "../scripts/reducer"
+import { useAppSelector, useAppDispatch, rootStore } from "../scripts/reducer"
 import { toggleMenu, openGroupMenu } from "../scripts/models/app"
 import { toggleGroupExpansion } from "../scripts/models/group"
+import { fetchItems } from "../scripts/models/item"
 import {
     selectAllArticles,
     selectSources,
@@ -152,6 +153,23 @@ const useMenuClasses = makeStyles({
     primaryIcon: {
         color: tokens.colorCompoundBrandForeground1,
     },
+    notice: {
+        position: "absolute",
+        left: "16px",
+        right: "16px",
+        bottom: "16px",
+        padding: "8px 12px",
+        borderRadius: tokens.borderRadiusMedium,
+        backgroundColor: tokens.colorNeutralBackground1,
+        border: `1px solid ${tokens.colorNeutralStroke1}`,
+        boxShadow: tokens.shadow16,
+        color: tokens.colorNeutralForeground2,
+        fontSize: "12px",
+        lineHeight: "18px",
+        textAlign: "center",
+        pointerEvents: "none",
+        zIndex: 3,
+    },
 })
 
 export const Menu: React.FC = () => {
@@ -236,6 +254,58 @@ export const Menu: React.FC = () => {
                 .reduce((a, b) => a + b, 0),
         [sources]
     )
+
+    const fetching = useAppSelector(s => s.app.fetchingItems)
+
+    // In unread-only mode a group with nothing new still shows up, and its
+    // count slot becomes a refresh button: the sidebar is the only place where
+    // the user can ask "did anything arrive here?" without opening the group.
+    const [refreshingGroups, setRefreshingGroups] = useState<
+        Record<number, boolean>
+    >({})
+    const [notice, setNotice] = useState<string | null>(null)
+    const noticeTimer = useRef<number>(null)
+    const showNotice = (text: string) => {
+        if (noticeTimer.current) clearTimeout(noticeTimer.current)
+        setNotice(text)
+        noticeTimer.current = window.setTimeout(() => setNotice(null), 2800)
+    }
+    useEffect(() => {
+        return () => {
+            if (noticeTimer.current) clearTimeout(noticeTimer.current)
+        }
+    }, [])
+
+    const unreadOfSources = (sids: number[]) =>
+        sids.reduce(
+            (sum, sid) =>
+                sum + (rootStore.getState().sources[sid]?.unreadCount || 0),
+            0
+        )
+
+    const refreshGroup = (sids: number[], gid: number) => {
+        if (refreshingGroups[gid] || fetching) return
+        const before = unreadOfSources(sids)
+        setRefreshingGroups(state => ({ ...state, [gid]: true }))
+        const settle = () =>
+            setRefreshingGroups(state => {
+                const next = { ...state }
+                delete next[gid]
+                return next
+            })
+        dispatch(fetchItems(false, sids))
+            .then(() => {
+                settle()
+                // Counts are read from the store: this render's `sources` is
+                // the value captured before the fetch ran.
+                if (unreadOfSources(sids) <= before)
+                    showNotice(intl.get("menu.refreshedNoNew"))
+            })
+            .catch(() => {
+                settle()
+                showNotice(intl.get("menu.refreshFailed"))
+            })
+    }
 
     const treeRef = useRef<HTMLDivElement>(null)
     const previousDisplayRef = useRef(display)
@@ -428,6 +498,10 @@ export const Menu: React.FC = () => {
                                 .filter(g => {
                                     if (g.sids.length === 0) return false
                                     if (!isUnreadSourcesOnly) return true
+                                    // A real group stays visible even with
+                                    // nothing unread: its count slot then holds
+                                    // the refresh button.
+                                    if (g.isMultiple) return true
                                     return g.sids.some(
                                         sid => sources[sid]?.unreadCount > 0
                                     )
@@ -457,6 +531,23 @@ export const Menu: React.FC = () => {
                                                 label={g.name}
                                                 isSelected={isGroupSelected}
                                                 unreadCount={groupUnread}
+                                                refresh={
+                                                    isUnreadSourcesOnly &&
+                                                    groupUnread === 0
+                                                        ? {
+                                                              busy: Boolean(
+                                                                  refreshingGroups[
+                                                                      g.gid
+                                                                  ]
+                                                              ) || fetching,
+                                                              onClick: () =>
+                                                                  refreshGroup(
+                                                                      g.sids,
+                                                                      g.gid
+                                                                  ),
+                                                          }
+                                                        : undefined
+                                                }
                                                 viewType={groupViews[groupKey]}
                                                 onClick={() =>
                                                     handleSelectSourceGroup(
@@ -485,6 +576,11 @@ export const Menu: React.FC = () => {
                                     }
                                 })}
                         </Tree>
+                        {notice && (
+                            <div className={menuClasses.notice} role="status">
+                                {notice}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -530,6 +626,32 @@ const useTreeItemClasses = makeStyles({
         paddingLeft: "4px",
         flexShrink: 0,
     },
+    // Stands in for the unread count of a group that has none: in unread-only
+    // mode such a group still needs a way to ask "anything new in here?".
+    refreshAction: {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "padding": "0 6px",
+        "border": "none",
+        "borderRadius": tokens.borderRadiusSmall,
+        "background": "transparent",
+        "color": tokens.colorCompoundBrandForeground1,
+        "font": "inherit",
+        "fontSize": "12px",
+        "lineHeight": "20px",
+        "cursor": "pointer",
+        "flexShrink": 0,
+        ":hover": {
+            backgroundColor: tokens.colorSubtleBackgroundHover,
+            textDecoration: "underline",
+        },
+        ":disabled": {
+            color: tokens.colorNeutralForeground4,
+            cursor: "default",
+            textDecoration: "none",
+            backgroundColor: "transparent",
+        },
+    },
     asideGroup: {
         display: "flex",
         alignItems: "center",
@@ -565,6 +687,9 @@ interface MenuTreeItemProps {
     isSelected?: boolean
     icon?: React.ReactElement
     unreadCount?: number
+    // Replaces the unread count with a refresh button: an empty group in
+    // unread-only mode still needs a way to ask for new items.
+    refresh?: { busy: boolean; onClick: () => void }
     // set when this entry remembers a view of its own
     viewType?: ViewType
     aside?: React.ReactElement
@@ -583,6 +708,7 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
     unreadCount,
     viewType,
     aside,
+    refresh,
     onClick,
     onContextMenu,
     children,
@@ -595,10 +721,26 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
                 {unreadCount >= 1000 ? "999+" : String(unreadCount)}
             </span>
         ) : undefined
+    const countSlot = refresh ? (
+        <button
+            type="button"
+            className={c.refreshAction}
+            disabled={refresh.busy}
+            title={intl.get(refresh.busy ? "menu.refreshing" : "menu.refresh")}
+            onClick={e => {
+                // Without this the click also selects and expands the group.
+                e.stopPropagation()
+                refresh.onClick()
+            }}>
+            {intl.get(refresh.busy ? "menu.refreshing" : "menu.refresh")}
+        </button>
+    ) : (
+        count
+    )
     let resolvedAside: React.ReactElement | undefined = aside
     if (
         resolvedAside === undefined &&
-        (viewType !== undefined || count || suffix)
+        (viewType !== undefined || countSlot || suffix || refresh)
     ) {
         resolvedAside = (
             <span className={c.asideGroup}>
@@ -611,7 +753,7 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
                         <Icon iconName={VIEW_ICONS[viewType]} />
                     </span>
                 ) : null}
-                {count}
+                {countSlot}
             </span>
         )
     }
