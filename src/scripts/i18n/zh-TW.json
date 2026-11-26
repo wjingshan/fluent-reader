@@ -1,4 +1,17 @@
 {
+    "summary": {
+        "action": "用 AI 總結這一頁",
+        "glyph": "概",
+        "title": "AI 摘要",
+        "loading": "正在讀這一頁…",
+        "close": "關閉",
+        "points": "要點",
+        "details": "細節",
+        "disclaimer": "AI 產生，僅供參考",
+        "retry": "重新總結",
+        "noKey": "未設定 API Key，請在「選項 → 應用偏好」中填寫 DeepSeek API Key。",
+        "failed": "總結失敗：{error}"
+    },
     "allArticles": "全部文章",
     "add": "新增",
     "create": "新建",

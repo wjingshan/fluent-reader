@@ -1,5 +1,6 @@
 import { ipcRenderer } from "electron"
 import {
+    SummaryResult,
     TranslationBlocksResult,
     TranslationKeyState,
     TranslationResult,
@@ -8,6 +9,12 @@ import {
 const translationBridge = {
     translate: (title: string, snippet: string): Promise<TranslationResult> => {
         return ipcRenderer.invoke("translate-text", title, snippet)
+    },
+
+    // Whole-page summary: the reader sends the page's own text, the main
+    // process calls the model and returns the parseable parts.
+    summarize: (title: string, text: string): Promise<SummaryResult> => {
+        return ipcRenderer.invoke("summarize-text", title, text)
     },
 
     // Article bodies: one request per batch of chunks, in order.

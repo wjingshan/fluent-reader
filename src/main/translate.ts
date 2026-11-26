@@ -1,6 +1,7 @@
 import { ipcMain, net } from "electron"
 import { store } from "./settings"
 import {
+    SummaryResult,
     TranslationBlocksResult,
     TranslationError,
     TranslationKeyState,
@@ -13,6 +14,13 @@ const MODEL = "deepseek-flash"
 const KEY_STORE_KEY = "translateApiKey"
 const ENV_KEY = "DEEPSEEK_API_KEY"
 const TIMEOUT_MS = 45000
+// A summary reads the whole page instead of a few sentences, so it gets a
+// wider budget than a translation batch.
+const SUMMARY_TIMEOUT_MS = 60000
+// Characters of page text sent to the model. A long release note fits whole;
+// anything past this is cut, because the tail of a page rarely changes the
+// verdict and every extra character slows the answer down.
+const SUMMARY_INPUT_CHARS = 14000
 // A marker the model is told to keep verbatim, so the title and the snippet
 // travel in one request and can be split back apart. Deliberately unusual so
 // it cannot collide with article text.
@@ -39,6 +47,20 @@ const BLOCK_PROMPT = [
         CHUNK_SEPARATOR +
         "，分隔符之前是第一段，之后是下一段。必须原样保留每一行分隔符，不要翻译、删除或改写它，输出的段数必须与输入相同。",
     "文字中可能出现形如 ⟦3⟧ 与 ⟦/3⟧ 的标记，它们是网页标签的占位符。把标记原样留在原来的位置，只翻译标记之外的文字；不要新增、删除、合并或调换任何标记。",
+].join("\n")
+
+// A summary answers "is this worth reading, and what actually changed?". The
+// reply is a labelled plain-text outline rather than JSON: the panel only needs
+// a headline, a few points and optional details, and a model that miscounts a
+// bracket in JSON costs the whole answer, while a stray line in this format
+// still parses.
+const SUMMARY_PROMPT = [
+    "你是阅读助手，替用户读一页内容并提炼重点，尤其是「有什么变化、新在哪里」。",
+    "用简体中文，只输出下面三段纯文本，不要 Markdown 代码块，不要任何解释。",
+    "总结：一句话结论，不超过 40 字，说清这页最要紧的一件事。",
+    "要点：另起一行，下面是 3 到 6 条要点，每条以「- 」开头，不超过 50 字，按重要性排序；如果这是软件发布说明，要覆盖新增功能、改进、修复。",
+    "细节：另起一行，下面是 0 到 3 条事实，每条以「- 」开头，写版本号、适用平台、限制、已知问题这类值得留意的东西；没有就不写这一段。",
+    "只依据给出的正文，不要补充正文以外的知识，也不要空话套话。",
 ].join("\n")
 
 type ChatResponse = {
@@ -90,11 +112,12 @@ function post(url: string, init: RequestInit): Promise<Response> {
 // Holds the request to a fixed budget even if the transport ignores the signal.
 async function withDeadline<T>(
     request: Promise<T>,
-    timeoutMessage: string
+    timeoutMessage: string,
+    timeoutMs: number = TIMEOUT_MS
 ): Promise<T> {
     let timer: ReturnType<typeof setTimeout>
     const deadline = new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(timeoutMessage)), TIMEOUT_MS)
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
     })
     try {
         return await Promise.race([request, deadline])
@@ -106,7 +129,8 @@ async function withDeadline<T>(
 async function requestTranslation(
     key: string,
     content: string,
-    systemPrompt: string = SYSTEM_PROMPT
+    systemPrompt: string = SYSTEM_PROMPT,
+    timeoutMs: number = TIMEOUT_MS
 ): Promise<RawText> {
     const body = {
         model: MODEL,
@@ -128,9 +152,10 @@ async function requestTranslation(
                     "Authorization": "Bearer " + key,
                 },
                 body: JSON.stringify(body),
-                signal: AbortSignal.timeout(TIMEOUT_MS),
+                signal: AbortSignal.timeout(timeoutMs),
             }),
-            "Request timed out"
+            "Request timed out",
+            timeoutMs
         )
     } catch (error) {
         return failed("api-error", errorText(error))
@@ -166,6 +191,88 @@ async function requestTranslation(
 
 function fromError(error: TranslationError): TranslationResult {
     return { title: "", snippet: "", error: error }
+}
+
+function summaryError(error: TranslationError): SummaryResult {
+    return { tldr: "", points: [], details: [], error }
+}
+
+const POINT_BULLET = /^[-*·•]\s*/
+const TLDR_LABEL = /^(总结|结论|一句话结论|摘要)[:：]\s*/
+const POINTS_LABEL = /^(要点|重点|主要内容)[:：]?\s*$/
+const DETAILS_LABEL = /^(细节|补充|备注|其他)[:：]?\s*$/
+const FENCE = /^```/
+
+// The reply is a labelled outline, but a model still drifts: bullets become
+// numbers, the labels turn into "一句话总结：" or the whole thing wraps in a
+// code fence. Each line is therefore classified on its own, and anything that
+// cannot be placed still lands in the list it was travelling towards, so a
+// half-formatted answer stays readable instead of dumping raw markup.
+function parseSummary(text: string): SummaryResult {
+    const trimmed = text.trim()
+    const raw: SummaryResult = {
+        tldr: "",
+        points: [],
+        details: [],
+        text: trimmed,
+    }
+    let tldr = ""
+    const points: string[] = []
+    const details: string[] = []
+    let section: "points" | "details" = "points"
+    let labelled = false
+    for (const line of trimmed.split(/\r?\n/)) {
+        const value = line.trim()
+        if (!value || FENCE.test(value)) continue
+        if (POINTS_LABEL.test(value)) {
+            section = "points"
+            labelled = true
+            continue
+        }
+        if (DETAILS_LABEL.test(value)) {
+            section = "details"
+            labelled = true
+            continue
+        }
+        if (TLDR_LABEL.test(value)) {
+            tldr = value.replace(TLDR_LABEL, "").trim()
+            labelled = true
+            continue
+        }
+        const bullet = POINT_BULLET.test(value)
+        const body = bullet ? value.replace(POINT_BULLET, "").trim() : value
+        if (!body) continue
+        if (!bullet && !tldr && !labelled) {
+            tldr = body
+            continue
+        }
+        if (section === "details") {
+            if (details.length < 3) details.push(body)
+        } else if (points.length < 6) {
+            points.push(body)
+        }
+    }
+    if (!tldr && points.length === 0) return raw
+    return { tldr, points, details }
+}
+
+async function summarize(
+    key: string,
+    title: string,
+    text: string
+): Promise<SummaryResult> {
+    const payload =
+        (title ? "标题：" + title + "\n\n" : "") +
+        "正文：\n" +
+        text.slice(0, SUMMARY_INPUT_CHARS)
+    const answer = await requestTranslation(
+        key,
+        payload,
+        SUMMARY_PROMPT,
+        SUMMARY_TIMEOUT_MS
+    )
+    if (answer.error) return summaryError(answer.error)
+    return parseSummary(answer.text || "")
 }
 
 async function translate(
@@ -296,6 +403,23 @@ export function setTranslateListeners() {
                 }
             }
             return translateBlocks(key, list)
+        }
+    )
+
+    ipcMain.handle(
+        "summarize-text",
+        async (_, title: unknown, text: unknown): Promise<SummaryResult> => {
+            const key = resolveKey()
+            if (!key) return summaryError({ code: "no-key" })
+            const titleText = typeof title === "string" ? title.trim() : ""
+            const bodyText = typeof text === "string" ? text.trim() : ""
+            if (!bodyText) {
+                return summaryError({
+                    code: "bad-response",
+                    message: "Nothing to summarize",
+                })
+            }
+            return summarize(key, titleText, bodyText)
         }
     )
 

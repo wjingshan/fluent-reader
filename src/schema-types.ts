@@ -304,6 +304,17 @@ export interface TranslationBlocksResult {
     error?: TranslationError
 }
 
+// A page summary: one sentence the reader can act on, then the main points
+// (what changed / what is new) and any details worth noticing. `text` carries
+// the model's raw answer when it did not come back as parseable JSON.
+export interface SummaryResult {
+    tldr: string
+    points: string[]
+    details: string[]
+    text?: string
+    error?: TranslationError
+}
+
 export interface TranslationKeyState {
     // Key saved by the user. Empty when only the environment variable is set.
     key: string

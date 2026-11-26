@@ -41,7 +41,16 @@ import {
 } from "../scripts/models/app"
 import { useArticleView } from "./utils/hooks/useArticleView"
 import { useArticleTranslation } from "./utils/hooks/useArticleTranslation"
+import { useArticleSummary } from "./utils/hooks/useArticleSummary"
 import { translationMessage } from "../scripts/translate"
+import {
+    failSummary,
+    getSummary,
+    readArticleText,
+    regenerateSummary,
+    requestSummary,
+    SummaryRecord,
+} from "../scripts/article-summary"
 import {
     ArticleVariant,
     clearArticleTranslationError,
@@ -58,6 +67,7 @@ const useStyles = makeStyles({
     root: {
         "height": "100%",
         "minWidth": 0,
+        "position": "relative",
         "userSelect": "none",
         "& i.ms-Icon": { color: "var(--neutralDarker)" },
     },
@@ -121,6 +131,210 @@ const useStyles = makeStyles({
     errorCode: { fontSize: "11px" },
 })
 
+// The summary floats over the article body: the body is a webview, so anything
+// inline would have to be injected into the guest. A panel also keeps the text
+// selectable and dismissable without touching the page.
+const useSummaryStyles = makeStyles({
+    panel: {
+        "position": "absolute",
+        "top": "48px",
+        "right": "16px",
+        "width": "400px",
+        "maxWidth": "calc(100% - 32px)",
+        "maxHeight": "calc(100% - 72px)",
+        "display": "flex",
+        "flexDirection": "column",
+        "backgroundColor": "var(--white)",
+        "border": "1px solid var(--neutralQuaternaryAlt)",
+        "borderRadius": "10px",
+        "boxShadow": "0 10px 30px rgba(0, 0, 0, 0.18)",
+        "zIndex": 30,
+        "overflow": "hidden",
+        "color": "var(--black)",
+        "userSelect": "text",
+    },
+    header: {
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        padding: "8px 8px 8px 14px",
+        borderBottom: "1px solid var(--neutralQuaternaryAlt)",
+        flexShrink: 0,
+    },
+    title: {
+        flexGrow: 1,
+        fontSize: "12px",
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        color: "var(--neutralSecondaryAlt)",
+    },
+    iconButton: {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "width": "24px",
+        "height": "24px",
+        "padding": "0",
+        "border": "none",
+        "borderRadius": "4px",
+        "background": "transparent",
+        "color": "var(--neutralSecondaryAlt)",
+        "cursor": "pointer",
+        ":hover": {
+            backgroundColor: "var(--neutralLight)",
+            color: "var(--black)",
+        },
+    },
+    body: {
+        padding: "12px 16px 4px",
+        overflowY: "auto",
+        flexGrow: 1,
+    },
+    tldr: {
+        margin: "0 0 12px",
+        fontSize: "15px",
+        fontWeight: 600,
+        lineHeight: "23px",
+    },
+    sectionLabel: {
+        margin: "0 0 5px",
+        fontSize: "11px",
+        fontWeight: 600,
+        letterSpacing: "0.08em",
+        color: "var(--neutralSecondaryAlt)",
+    },
+    list: {
+        margin: "0 0 12px",
+        padding: "0 0 0 18px",
+        fontSize: "13px",
+        lineHeight: "21px",
+    },
+    detailList: {
+        margin: "0 0 10px",
+        padding: "0 0 0 18px",
+        fontSize: "12px",
+        lineHeight: "19px",
+        color: "var(--neutralSecondary)",
+    },
+    raw: {
+        margin: "0 0 12px",
+        fontSize: "13px",
+        lineHeight: "21px",
+        whiteSpace: "pre-wrap",
+    },
+    hint: {
+        margin: "2px 0 12px",
+        fontSize: "13px",
+        lineHeight: "20px",
+        color: "var(--neutralSecondary)",
+    },
+    loading: {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        padding: "4px 0 14px",
+        fontSize: "13px",
+        color: "var(--neutralSecondary)",
+    },
+    footer: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "8px",
+        padding: "8px 16px 10px",
+        borderTop: "1px solid var(--neutralQuaternaryAlt)",
+        fontSize: "11px",
+        color: "var(--neutralTertiaryAlt)",
+        flexShrink: 0,
+    },
+})
+
+// One panel for the three states the request can be in: waiting, failed with a
+// readable reason, or answered. A reply that did not come back as JSON is shown
+// as plain text instead of being dropped.
+function SummaryPanel({
+    record,
+    onClose,
+    onRetry,
+}: {
+    record: SummaryRecord
+    onClose: () => void
+    onRetry: () => void
+}) {
+    const c = useSummaryStyles()
+    const failed =
+        record.status === "error"
+            ? record.code === "no-key"
+                ? intl.get("summary.noKey")
+                : intl.get("summary.failed", {
+                      error: record.message || record.code || "",
+                  })
+            : ""
+    const hasAnswer = record.status === "ready"
+    const hasStructure =
+        hasAnswer && (Boolean(record.tldr) || (record.points || []).length > 0)
+    return (
+        <div className={c.panel} role="dialog" aria-label={intl.get("summary.title")}>
+            <div className={c.header}>
+                <span className={c.title}>{intl.get("summary.title")}</span>
+                <button
+                    type="button"
+                    className={c.iconButton}
+                    title={intl.get("summary.close")}
+                    aria-label={intl.get("summary.close")}
+                    onClick={onClose}>
+                    <Icon iconName="Cancel" />
+                </button>
+            </div>
+            <div className={c.body}>
+                {record.status === "loading" && (
+                    <div className={c.loading}>
+                        <Spinner size="tiny" />
+                        {intl.get("summary.loading")}
+                    </div>
+                )}
+                {record.status === "error" && <p className={c.hint}>{failed}</p>}
+                {hasStructure && record.tldr ? (
+                    <p className={c.tldr}>{record.tldr}</p>
+                ) : null}
+                {hasStructure && (record.points || []).length > 0 ? (
+                    <>
+                        <div className={c.sectionLabel}>
+                            {intl.get("summary.points")}
+                        </div>
+                        <ul className={c.list}>
+                            {(record.points || []).map((point, idx) => (
+                                <li key={idx}>{point}</li>
+                            ))}
+                        </ul>
+                    </>
+                ) : null}
+                {hasStructure && (record.details || []).length > 0 ? (
+                    <>
+                        <div className={c.sectionLabel}>
+                            {intl.get("summary.details")}
+                        </div>
+                        <ul className={c.detailList}>
+                            {(record.details || []).map((detail, idx) => (
+                                <li key={idx}>{detail}</li>
+                            ))}
+                        </ul>
+                    </>
+                ) : null}
+                {hasAnswer && !hasStructure && record.text ? (
+                    <p className={c.raw}>{record.text}</p>
+                ) : null}
+            </div>
+            {record.status !== "loading" && (
+                <div className={c.footer}>
+                    <span>{intl.get("summary.disclaimer")}</span>
+                    <Link onClick={onRetry}>{intl.get("summary.retry")}</Link>
+                </div>
+            )}
+        </div>
+    )
+}
+
 const FONT_SIZE_OPTIONS = [12, 13, 14, 15, 16, 17, 18, 19, 20]
 
 type ArticleProps = Readonly<{
@@ -163,6 +377,14 @@ function Article({ itemId, side = false }: ArticleProps) {
     const bodyFailed = bodyRecord?.status === "error"
     const bodyTranslated =
         bodyRecord?.status === "translated" && !bodyRecord.showOriginal
+
+    // Summary: a panel over the body, cached per article so reopening costs
+    // nothing. The request is only made when the panel is opened.
+    const summaryRecord = useArticleSummary(itemId)
+    const [summaryOpen, setSummaryOpen] = useState(false)
+    useEffect(() => {
+        setSummaryOpen(false)
+    }, [itemId])
 
     const dismiss = () => dispatch(dismissItem())
     const handleNavigationKey = useCallback(
@@ -317,6 +539,26 @@ function Article({ itemId, side = false }: ArticleProps) {
         }
         await requestArticleTranslation(itemId, variant, html)
     }, [itemId, loadFull, loadWebpage])
+
+    const runSummary = useCallback(
+        async (force: boolean) => {
+            setSummaryOpen(true)
+            const cached = getSummary(itemId)
+            // A cached answer opens instantly; only a retry asks again.
+            if (!force && cached && cached.status !== "error") return
+            const node = webview.current
+            if (!node) return
+            const text = await readArticleText(node)
+            if (!text) {
+                failSummary(itemId, "unavailable")
+                return
+            }
+            const title = typeof item.title === "string" ? item.title : ""
+            if (force) await regenerateSummary(itemId, title, text)
+            else await requestSummary(itemId, title, text)
+        },
+        [itemId, item.title, webview]
+    )
 
     const updateFontSize = (size: number) => {
         window.settings.setFontSize(size)
@@ -610,6 +852,17 @@ function Article({ itemId, side = false }: ArticleProps) {
                         />
                     )}
                     <CommandBarButton
+                        title={intl.get("summary.action")}
+                        text={intl.get("summary.glyph")}
+                        className={summaryOpen ? "active" : ""}
+                        iconProps={{ iconName: "ReadingMode" }}
+                        onClick={() =>
+                            summaryOpen
+                                ? setSummaryOpen(false)
+                                : runSummary(false)
+                        }
+                    />
+                    <CommandBarButton
                         title={intl.get("more")}
                         iconProps={{ iconName: "More" }}
                         menuIconProps={{ className: classes.menuIcon }}
@@ -665,6 +918,15 @@ function Article({ itemId, side = false }: ArticleProps) {
                     </Stack>
                     <span className={classes.errorCode}>{error}</span>
                 </Stack>
+            )}
+            {summaryOpen && (
+                <SummaryPanel
+                    record={summaryRecord || { status: "loading" }}
+                    // Closing only hides the panel: the answer stays cached, so
+                    // reopening the same article costs no request.
+                    onClose={() => setSummaryOpen(false)}
+                    onRetry={() => runSummary(true)}
+                />
             )}
         </FocusZone>
     )

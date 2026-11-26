@@ -1,4 +1,17 @@
 {
+    "summary": {
+        "action": "用 AI 总结这页内容",
+        "glyph": "概",
+        "title": "AI 摘要",
+        "loading": "正在读这一页…",
+        "close": "关闭",
+        "points": "要点",
+        "details": "细节",
+        "disclaimer": "AI 生成，仅供参考",
+        "retry": "重新总结",
+        "noKey": "未配置 API Key，请在「选项 → 应用偏好」中填写 DeepSeek API Key。",
+        "failed": "总结失败：{error}"
+    },
     "allArticles": "全部文章",
     "add": "添加",
     "create": "新建",
