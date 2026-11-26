@@ -256,11 +256,11 @@
             if (media.poster) video.poster = media.poster
             video.addEventListener("error", () => {
                 log("video error", media.url)
-                card.classList.remove("fr-hover")
-                card.classList.add("fr-video-broken")
+                markBroken(card, video, media)
             })
             video.addEventListener("playing", () => {
                 card.classList.remove("fr-video-broken")
+                card.querySelector(":scope > button.fr-video-retry")?.remove()
             })
             card.appendChild(video)
         }
@@ -269,7 +269,72 @@
             video.dataset.src = media.url
             if (video.getAttribute("src")) video.src = media.url
             card.classList.remove("fr-video-broken")
+            card.querySelector(":scope > button.fr-video-retry")?.remove()
         }
+    }
+
+    // ------------------------------------------------------ failed video retry
+    //
+    // A dead video hides itself and leaves the tile on its still thumbnail.
+    // Nothing else on the card tells the user why, so surface one explicit
+    // action: press it, and the tile clears its failed state and loads again.
+
+    const RETRY_LABEL = "重新加载"
+    const RETRY_TIMEOUT_MS = 6000
+
+    function markBroken(card, video, media) {
+        card.classList.remove("fr-hover")
+        card.classList.add("fr-video-broken")
+        video.pause()
+        const button = card.querySelector(":scope > button.fr-video-retry")
+        if (!button) {
+            const retry = document.createElement("button")
+            retry.className = "fr-video-retry"
+            retry.type = "button"
+            retry.textContent = RETRY_LABEL
+            retry.title = "重新加载这段视频"
+            retry.addEventListener("click", event => {
+                // clicking the card itself opens the article, so keep this
+                // button to itself
+                event.preventDefault()
+                event.stopPropagation()
+                reloadVideo(card, video, media, retry)
+            })
+            card.appendChild(retry)
+        }
+    }
+
+    function reloadVideo(card, video, media, button) {
+        const url = (media && media.url) || video.dataset.src
+        if (!url) {
+            button.remove()
+            return
+        }
+        button.disabled = true
+        button.textContent = "重新加载中…"
+        card.classList.remove("fr-video-broken")
+        video.dataset.src = url
+        // The element is already in a failed state: dropping the src first is
+        // what makes it fetch again instead of replaying the cached failure.
+        video.removeAttribute("src")
+        video.src = url
+        video.load()
+        card.classList.add("fr-hover")
+        const started = video.play()
+        if (started && typeof started.catch === "function") {
+            started.catch(err => {
+                if (err && err.name === "AbortError") return
+                log("play rejected", err && err.name, err && err.message)
+            })
+        }
+        setTimeout(() => {
+            if (!button.isConnected) return
+            if (video.readyState >= 2 || !video.paused) return
+            card.classList.add("fr-video-broken")
+            card.classList.remove("fr-hover")
+            button.disabled = false
+            button.textContent = RETRY_LABEL
+        }, RETRY_TIMEOUT_MS)
     }
 
     // ------------------------------------------------------- import to Eagle
@@ -417,6 +482,9 @@
     function play(card) {
         const video = card.querySelector(":scope > video.fr-zoom")
         if (!video) return
+        // A card that already failed stays on its thumbnail: it has an explicit
+        // "重新加载" button, and hovering must not fight that state.
+        if (card.classList.contains("fr-video-broken")) return
         if (!video.getAttribute("src")) {
             if (!video.dataset.src) return
             video.src = video.dataset.src

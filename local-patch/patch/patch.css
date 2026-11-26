@@ -36,6 +36,43 @@
     display: none;
 }
 
+/* A video that failed to load leaves the tile on its still thumbnail, so offer
+   a way back: press it and the tile reloads and tries to play again. */
+.fr-media.fr-video-broken > button.fr-video-retry {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 8;
+    height: 26px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 13px;
+    background: #000000cc;
+    color: #fff;
+    font-size: 12px;
+    line-height: 26px;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.fr-media.fr-video-broken > button.fr-video-retry:hover {
+    background: #000000e6;
+}
+
+/* A card view gives the media only its 144px header, so the button belongs in
+   the middle of that band, not in the middle of the whole card. */
+.fr-media.fr-video-broken:not([data-fr-wf]) > button.fr-video-retry {
+    top: 72px;
+}
+
+.fr-media.fr-video-broken > button.fr-video-retry:disabled {
+    cursor: default;
+    opacity: 0.72;
+}
+
 .fr-media-badge {
     position: absolute;
     top: 8px;
