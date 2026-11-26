@@ -223,17 +223,23 @@
         // the whole tile and marks itself with data-fr-wf.
         const waterfall = card.hasAttribute("data-fr-wf")
         if (!waterfall && !card.querySelector(":scope > img.head")) return
-        if (already === media.kind) return
 
-        card.dataset.frMedia = media.kind
-        card.classList.add("fr-media")
+        // Never trust the data-frMedia label on its own. React rebuilds a tile's
+        // children on every relayout (scrolling a waterfall, changing a filter),
+        // and that silently drops the nodes we appended while the label stays
+        // behind — the tile then looks like a video and plays nothing.
+        if (already !== media.kind) {
+            card.dataset.frMedia = media.kind
+            card.classList.add("fr-media")
+        }
 
-        if (!card.querySelector(":scope > .fr-media-badge")) {
-            const badge = document.createElement("span")
+        let badge = card.querySelector(":scope > .fr-media-badge")
+        if (!badge) {
+            badge = document.createElement("span")
             badge.className = "fr-media-badge"
-            badge.textContent = media.kind === "gif" ? "GIF" : "▶"
             card.appendChild(badge)
         }
+        badge.textContent = media.kind === "gif" ? "GIF" : "▶"
         addEagleButton(card, media)
         if (media.kind !== "video") return
 
@@ -253,9 +259,17 @@
                 card.classList.remove("fr-hover")
                 card.classList.add("fr-video-broken")
             })
+            video.addEventListener("playing", () => {
+                card.classList.remove("fr-video-broken")
+            })
             card.appendChild(video)
         }
-        video.dataset.src = media.url
+        // A rebuilt tile keeps the old src: refresh it when the body changed.
+        if (video.dataset.src !== media.url) {
+            video.dataset.src = media.url
+            if (video.getAttribute("src")) video.src = media.url
+            card.classList.remove("fr-video-broken")
+        }
     }
 
     // ------------------------------------------------------- import to Eagle
@@ -386,13 +400,27 @@
     function cardOf(target) {
         if (!(target instanceof Element)) return null
         const card = target.closest("div[data-iid]")
-        return card && card.dataset.frMedia === "video" ? card : null
+        if (!card) return null
+        const media = mediaByIid.get(Number(card.dataset.iid))
+        const kind = card.dataset.frMedia || (media && media.kind) || ""
+        if (kind !== "video") return null
+        // A relayout may have rebuilt this tile and dropped both the label and
+        // the overlay; repair it on the spot rather than ignore the hover.
+        if (!card.querySelector(":scope > video.fr-zoom")) {
+            if (!media || media.kind !== "video") return null
+            decorate(card)
+            if (!card.querySelector(":scope > video.fr-zoom")) return null
+        }
+        return card
     }
 
     function play(card) {
         const video = card.querySelector(":scope > video.fr-zoom")
         if (!video) return
-        if (!video.getAttribute("src")) video.src = video.dataset.src
+        if (!video.getAttribute("src")) {
+            if (!video.dataset.src) return
+            video.src = video.dataset.src
+        }
         card.classList.add("fr-hover")
         const started = video.play()
         if (started && typeof started.catch === "function") {
@@ -413,6 +441,13 @@
         }
     }
 
+    // A waterfall relayouts itself whenever a tile changes size, and that
+    // removes the element the pointer was standing on. Chromium then reports
+    // mouseout with relatedTarget = null although the pointer never left the
+    // tile, so stopping immediately makes a video die under a still cursor.
+    // Wait a beat and only stop if the tile really lost the hover.
+    let stopTimer = null
+
     document.addEventListener(
         "mouseover",
         event => {
@@ -420,6 +455,10 @@
             if (!card) return
             const from = event.relatedTarget
             if (from instanceof Node && card.contains(from)) return
+            if (stopTimer) {
+                clearTimeout(stopTimer)
+                stopTimer = null
+            }
             play(card)
         },
         true
@@ -432,6 +471,16 @@
             if (!card) return
             const to = event.relatedTarget
             if (to instanceof Node && card.contains(to)) return
+            if (!to) {
+                if (stopTimer) clearTimeout(stopTimer)
+                stopTimer = setTimeout(() => {
+                    stopTimer = null
+                    if (!card.isConnected) return
+                    if (card.matches(":hover")) return
+                    stop(card)
+                }, 140)
+                return
+            }
             stop(card)
         },
         true
@@ -629,10 +678,37 @@
         }
     }
 
+    // React rebuilds a tile's children on every relayout and takes our overlay
+    // with them, so a tile that was playing can come back bare. Re-decorate the
+    // owning card when that happens, batched to stay off the layout path.
+    const pendingDecorate = new Set()
+    let decorateTimer = null
+
+    function flushDecorate() {
+        if (decorateTimer) return
+        decorateTimer = setTimeout(() => {
+            decorateTimer = null
+            const cards = [...pendingDecorate]
+            pendingDecorate.clear()
+            for (const card of cards) if (card.isConnected) decorate(card)
+        }, 0)
+    }
+
     const observer = new MutationObserver(records => {
         for (const record of records) {
             for (const node of record.addedNodes) {
                 if (node.nodeType === 1) scan(node)
+            }
+            const parent = record.target instanceof Element ? record.target : null
+            if (!parent) continue
+            const card = parent.matches("div[data-iid]")
+                ? parent
+                : parent.closest("div[data-iid]")
+            if (!card) continue
+            const iid = Number(card.dataset.iid)
+            if (Number.isFinite(iid) && mediaByIid.has(iid)) {
+                pendingDecorate.add(card)
+                flushDecorate()
             }
         }
     })

@@ -55,6 +55,7 @@ npm install              # 只装 @electron/asar
 ## 注意
 
 - 补丁只在**已安装的 asar** 上生效。改了 `src/` 需要先 `npm run build`，再重新注入。
+- **换 asar 必须重新注入。** 直接把新的 `app.asar` 覆盖到安装目录，补丁就没了——表现是瀑布流视频悬停不播放、Eagle 按钮消失、图床防盗链又开始裂图。本仓 `.pack/install.ps1` 已把注入和安装合成一步（以新 `dist` 为 override 打包），并校验 `main = ./dist/patch-main.js` 才算装好。
 - `app.asar.orig` 是还原的命脉，不要删。
 - 如果打完补丁后 Fluent Reader 打不开、也没有任何报错，多半是关闭时被强杀留下了 Chromium 单例锁——重启系统即可恢复。
 - 这些文件与 `/src` 的改动互相独立：`src` 决定程序逻辑，`local-patch` 决定网络请求与卡片注入。
