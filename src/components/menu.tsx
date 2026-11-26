@@ -26,6 +26,7 @@ import {
 } from "@fluentui/react-components"
 import { useFocusFinders } from "@fluentui/react-tabster"
 import {
+    ArrowSync16Regular,
     Checkmark16Regular,
     DocumentOnePageMultiple16Regular,
     Filter12Filled,
@@ -255,8 +256,6 @@ export const Menu: React.FC = () => {
         [sources]
     )
 
-    const fetching = useAppSelector(s => s.app.fetchingItems)
-
     // In unread-only mode a group with nothing new still shows up, and its
     // count slot becomes a refresh button: the sidebar is the only place where
     // the user can ask "did anything arrive here?" without opening the group.
@@ -283,9 +282,23 @@ export const Menu: React.FC = () => {
             0
         )
 
+    // fetchItems is a global switch: it silently does nothing while any fetch
+    // is in flight. Refreshing one group must not be swallowed just because
+    // another group (or the scheduler) is fetching, so wait for the slot first
+    // instead of dropping the request.
+    const waitForFetchSlot = async () => {
+        const deadline = Date.now() + 90000
+        while (Date.now() < deadline) {
+            const app = rootStore.getState().app
+            if (!app.fetchingItems && !app.syncing) return true
+            await new Promise(resolve => setTimeout(resolve, 150))
+        }
+        return false
+    }
+
     const refreshGroup = (sids: number[], gid: number) => {
-        if (refreshingGroups[gid] || fetching) return
-        const before = unreadOfSources(sids)
+        // Only this group is busy, so a second group must still be clickable.
+        if (refreshingGroups[gid]) return
         setRefreshingGroups(state => ({ ...state, [gid]: true }))
         const settle = () =>
             setRefreshingGroups(state => {
@@ -293,18 +306,21 @@ export const Menu: React.FC = () => {
                 delete next[gid]
                 return next
             })
-        dispatch(fetchItems(false, sids))
-            .then(() => {
-                settle()
-                // Counts are read from the store: this render's `sources` is
-                // the value captured before the fetch ran.
-                if (unreadOfSources(sids) <= before)
-                    showNotice(intl.get("menu.refreshedNoNew"))
-            })
-            .catch(() => {
-                settle()
+        const run = async () => {
+            if (!(await waitForFetchSlot())) {
                 showNotice(intl.get("menu.refreshFailed"))
-            })
+                return
+            }
+            const before = unreadOfSources(sids)
+            await dispatch(fetchItems(false, sids))
+            // Counts are read from the store: this render's `sources` is the
+            // value captured before the fetch ran.
+            if (unreadOfSources(sids) <= before)
+                showNotice(intl.get("menu.refreshedNoNew"))
+        }
+        run()
+            .catch(() => showNotice(intl.get("menu.refreshFailed")))
+            .finally(settle)
     }
 
     const treeRef = useRef<HTMLDivElement>(null)
@@ -535,11 +551,16 @@ export const Menu: React.FC = () => {
                                                     isUnreadSourcesOnly &&
                                                     groupUnread === 0
                                                         ? {
+                                                              // Keyed by this
+                                                              // group only: a
+                                                              // refresh in one
+                                                              // group must not
+                                                              // spin the others.
                                                               busy: Boolean(
                                                                   refreshingGroups[
                                                                       g.gid
                                                                   ]
-                                                              ) || fetching,
+                                                              ),
                                                               onClick: () =>
                                                                   refreshGroup(
                                                                       g.sids,
@@ -631,26 +652,38 @@ const useTreeItemClasses = makeStyles({
     refreshAction: {
         "display": "inline-flex",
         "alignItems": "center",
-        "padding": "0 6px",
+        "justifyContent": "center",
+        "width": "20px",
+        "height": "20px",
+        "padding": "0",
         "border": "none",
         "borderRadius": tokens.borderRadiusSmall,
         "background": "transparent",
         "color": tokens.colorCompoundBrandForeground1,
-        "font": "inherit",
-        "fontSize": "12px",
-        "lineHeight": "20px",
+        "fontSize": "16px",
+        "lineHeight": "16px",
         "cursor": "pointer",
         "flexShrink": 0,
         ":hover": {
             backgroundColor: tokens.colorSubtleBackgroundHover,
-            textDecoration: "underline",
         },
         ":disabled": {
-            color: tokens.colorNeutralForeground4,
+            // A spinning brand-coloured arrow reads as "working"; grey would
+            // read as "not available".
+            color: tokens.colorCompoundBrandForeground1,
+            opacity: 0.55,
             cursor: "default",
-            textDecoration: "none",
             backgroundColor: "transparent",
         },
+    },
+    refreshSpinning: {
+        animationName: {
+            from: { transform: "rotate(0deg)" },
+            to: { transform: "rotate(360deg)" },
+        },
+        animationDuration: "900ms",
+        animationIterationCount: "infinite",
+        animationTimingFunction: "linear",
     },
     asideGroup: {
         display: "flex",
@@ -727,12 +760,17 @@ const MenuTreeItem: React.FC<MenuTreeItemProps> = ({
             className={c.refreshAction}
             disabled={refresh.busy}
             title={intl.get(refresh.busy ? "menu.refreshing" : "menu.refresh")}
+            aria-label={intl.get(
+                refresh.busy ? "menu.refreshing" : "menu.refresh"
+            )}
             onClick={e => {
                 // Without this the click also selects and expands the group.
                 e.stopPropagation()
                 refresh.onClick()
             }}>
-            {intl.get(refresh.busy ? "menu.refreshing" : "menu.refresh")}
+            <ArrowSync16Regular
+                className={refresh.busy ? c.refreshSpinning : undefined}
+            />
         </button>
     ) : (
         count
