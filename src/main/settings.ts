@@ -268,14 +268,13 @@ function refreshShellIcons(lnks: string[]) {
             [
                 "-NoProfile",
                 "-NonInteractive",
-                "-WindowStyle",
-                "Hidden",
                 "-EncodedCommand",
                 Buffer.from(script, "utf16le").toString("base64"),
             ],
-            { detached: true, stdio: "ignore", windowsHide: true }
+            { stdio: "ignore", windowsHide: true }
         )
-        child.unref()
+        // detached 的进程发出去的通知不生效（实测），这里保持普通子进程，出错就静默
+        child.on("error", () => {})
     } catch {}
 }
 
