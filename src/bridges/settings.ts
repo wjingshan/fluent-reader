@@ -2,6 +2,7 @@ import {
     SourceGroup,
     ViewType,
     ThemeSettings,
+    AppIcon,
     SearchEngines,
     ServiceConfigs,
     ViewConfigs,
@@ -76,6 +77,13 @@ const settingsBridge = {
         ipcRenderer.on("theme-updated", (_, shouldDark) => {
             callback(shouldDark)
         })
+    },
+
+    getAppIcon: (): AppIcon => {
+        return ipcRenderer.sendSync("get-app-icon")
+    },
+    setAppIcon: (icon: AppIcon) => {
+        ipcRenderer.invoke("set-app-icon", icon)
     },
 
     setLocaleSettings: (option: string) => {

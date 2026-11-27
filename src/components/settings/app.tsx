@@ -7,7 +7,7 @@ import {
     calculateItemSize,
     getSearchEngineName,
 } from "../../scripts/utils"
-import { ThemeSettings, SearchEngines } from "../../schema-types"
+import { ThemeSettings, SearchEngines, AppIcon } from "../../schema-types"
 import {
     getThemeSettings,
     setThemeSettings,
@@ -45,7 +45,27 @@ const useStyles = makeStyles({
     cleanup: { width: "100%", minWidth: 0 },
     proxy: { gridTemplateColumns: "1fr auto", alignItems: "center" },
     hint: { color: tokens.colorNeutralForeground3 },
+    iconChoice: { display: "flex", alignItems: "center", gap: "6px" },
+    iconPreview: {
+        width: "20px",
+        height: "20px",
+        borderRadius: "4px",
+        flexShrink: 0,
+    },
 })
+
+const APP_ICON_OPTIONS: { value: AppIcon; file: string; key: string }[] = [
+    {
+        value: AppIcon.Default,
+        file: "icons/app-icon.png",
+        key: "app.appIconBlue",
+    },
+    {
+        value: AppIcon.Orange,
+        file: "icons/app-icon-orange.png",
+        key: "app.appIconOrange",
+    },
+]
 
 function AppTab({
     setLanguage,
@@ -59,6 +79,9 @@ function AppTab({
         window.settings.getLocaleSettings()
     )
     const [theme, setTheme] = useState(getThemeSettings)
+    const [appIcon, setAppIconState] = useState<AppIcon>(() =>
+        window.settings.getAppIcon()
+    )
     const [fetchInterval, setSelectedFetchInterval] = useState(() =>
         String(window.settings.getFetchInterval())
     )
@@ -222,6 +245,37 @@ function AppTab({
                         value={ThemeSettings.Dark}
                         label={intl.get("app.darkTheme")}
                     />
+                </RadioGroup>
+            </Field>
+
+            <Field
+                label={intl.get("app.appIcon")}
+                hint={intl.get("app.appIconHint")}>
+                <RadioGroup
+                    layout="horizontal"
+                    value={appIcon}
+                    onChange={(_, data) => {
+                        const value = data.value as AppIcon
+                        window.settings.setAppIcon(value)
+                        setAppIconState(value)
+                    }}>
+                    {APP_ICON_OPTIONS.map(option => (
+                        <Radio
+                            key={option.value}
+                            value={option.value}
+                            label={
+                                <span className={classes.iconChoice}>
+                                    <img
+                                        className={classes.iconPreview}
+                                        src={option.file}
+                                        alt=""
+                                        draggable={false}
+                                    />
+                                    {intl.get(option.key)}
+                                </span>
+                            }
+                        />
+                    ))}
                 </RadioGroup>
             </Field>
 

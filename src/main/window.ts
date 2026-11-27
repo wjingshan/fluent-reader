@@ -1,6 +1,6 @@
 import { BrowserWindow, nativeTheme, app } from "electron"
 import * as path from "node:path"
-import { setThemeListener } from "./settings"
+import { setThemeListener, setAppIconListener, applyStoredAppIcon } from "./settings"
 import { setUtilsListeners } from "./utils"
 
 export class WindowManager {
@@ -19,6 +19,7 @@ export class WindowManager {
 
     private setListeners = () => {
         setThemeListener(this)
+        setAppIconListener(this)
         setUtilsListeners(this)
 
         app.on("second-instance", () => {
@@ -65,6 +66,7 @@ export class WindowManager {
                     ),
                 },
             })
+            applyStoredAppIcon(this)
             this.mainWindow.on("ready-to-show", () => {
                 this.mainWindow.show()
                 this.mainWindow.focus()

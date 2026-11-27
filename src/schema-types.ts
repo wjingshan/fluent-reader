@@ -207,6 +207,12 @@ export const enum ThemeSettings {
     Dark = "dark",
 }
 
+// 任务栏/窗口图标版本，对应 dist/icons 下的两版 png（见 main/settings.ts）。
+export const enum AppIcon {
+    Default = "default",
+    Orange = "orange",
+}
+
 export const enum SearchEngines {
     Google,
     Bing,
@@ -363,4 +369,6 @@ export type SchemaTypes = {
     // Per-source external browser: sid -> browser id from get-browsers.
     // A missing key means the system browser.
     sourceBrowsers: Record<string, string>
+    // Window / taskbar icon variant (see AppIcon).
+    appIcon: AppIcon
 }

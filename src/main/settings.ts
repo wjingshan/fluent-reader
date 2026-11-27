@@ -4,6 +4,7 @@ import {
     SourceGroup,
     ViewType,
     ThemeSettings,
+    AppIcon,
     SearchEngines,
     SyncService,
     ServiceConfigs,
@@ -17,7 +18,8 @@ import {
     DEFAULT_LAYOUT_CONFIG,
     normalizeLayoutConfig,
 } from "../schema-types"
-import { ipcMain, session, nativeTheme, app } from "electron"
+import { ipcMain, session, nativeTheme, app, nativeImage } from "electron"
+import * as path from "node:path"
 import { WindowManager } from "./window"
 import { rememberSourceBrowser, transformLovefieldRules } from "./utils"
 export const store = new Store<SchemaTypes>({ cache: true })
@@ -176,6 +178,51 @@ export function setThemeListener(manager: WindowManager) {
             }
         }
     })
+}
+
+// Windows/Linux 的任务栏图标来自 exe 内置图标，只有设到窗口上才能换掉；
+// mac 走 dock。两版图标都是 dist/icons 下的 png（随包一起分发）。
+const APP_ICON_STORE_KEY = "appIcon"
+const APP_ICON_FILES: Record<AppIcon, string> = {
+    [AppIcon.Default]: "app-icon.png",
+    [AppIcon.Orange]: "app-icon-orange.png",
+}
+let iconManager: WindowManager = null
+
+export function getAppIconSettings(): AppIcon {
+    const stored = store.get(APP_ICON_STORE_KEY, AppIcon.Default)
+    return APP_ICON_FILES[stored] ? stored : AppIcon.Default
+}
+
+export function applyAppIcon(manager: WindowManager, icon: AppIcon) {
+    if (!manager || !manager.hasWindow()) return
+    const file = APP_ICON_FILES[icon] ?? APP_ICON_FILES[AppIcon.Default]
+    const image = nativeImage.createFromPath(
+        path.join(app.getAppPath(), "dist", "icons", file)
+    )
+    if (image.isEmpty()) return
+    if (process.platform === "darwin") {
+        app.dock?.setIcon(image)
+    } else {
+        manager.mainWindow.setIcon(image)
+    }
+}
+
+// 建窗时按已存设置套一次，否则默认永远是 exe 里那版。
+export function applyStoredAppIcon(manager: WindowManager) {
+    applyAppIcon(manager, getAppIconSettings())
+}
+
+ipcMain.on("get-app-icon", event => {
+    event.returnValue = getAppIconSettings()
+})
+ipcMain.handle("set-app-icon", (_, icon: AppIcon) => {
+    const value = APP_ICON_FILES[icon] ? icon : AppIcon.Default
+    store.set(APP_ICON_STORE_KEY, value)
+    applyAppIcon(iconManager, value)
+})
+export function setAppIconListener(manager: WindowManager) {
+    iconManager = manager
 }
 
 const LOCALE_STORE_KEY = "locale"
