@@ -18,8 +18,10 @@ import {
     DEFAULT_LAYOUT_CONFIG,
     normalizeLayoutConfig,
 } from "../schema-types"
-import { ipcMain, session, nativeTheme, app, nativeImage } from "electron"
+import { ipcMain, session, nativeTheme, app, nativeImage, shell } from "electron"
 import * as path from "node:path"
+import * as fs from "node:fs"
+import { spawn } from "node:child_process"
 import { WindowManager } from "./window"
 import { rememberSourceBrowser, transformLovefieldRules } from "./utils"
 export const store = new Store<SchemaTypes>({ cache: true })
@@ -187,6 +189,10 @@ const APP_ICON_FILES: Record<AppIcon, string> = {
     [AppIcon.Default]: "app-icon.png",
     [AppIcon.Orange]: "app-icon-orange.png",
 }
+const APP_ICON_ICO_FILES: Record<AppIcon, string> = {
+    [AppIcon.Default]: "app-icon.ico",
+    [AppIcon.Orange]: "app-icon-orange.ico",
+}
 let iconManager: WindowManager = null
 
 export function getAppIconSettings(): AppIcon {
@@ -208,9 +214,128 @@ export function applyAppIcon(manager: WindowManager, icon: AppIcon) {
     }
 }
 
+// Windows 的任务栏按钮（尤其是固定到任务栏的那种）取的是快捷方式里的图标，
+// 光给窗口 setIcon 是换不掉的，所以还要同步改写固定项。
+function pinnedTaskBarFolder() {
+    return path.join(
+        app.getPath("appData"),
+        "Microsoft",
+        "Internet Explorer",
+        "Quick Launch",
+        "User Pinned",
+        "TaskBar"
+    )
+}
+
+// ico 不能放在 asar 里给资源管理器读，先复制一份到用户数据目录。
+// 旧版本生成的 ico 只有 PNG 段，资源管理器读不出来会退回 exe 图标，这里按大小比对覆盖。
+function ensureIcoFile(icon: AppIcon): { file: string; replaced: boolean } {
+    const name = APP_ICON_ICO_FILES[icon]
+    const dir = path.join(app.getPath("userData"), "icons")
+    const dest = path.join(dir, name)
+    const src = path.join(app.getAppPath(), "dist", "icons", name)
+    let replaced = false
+    try {
+        const srcStat = fs.statSync(src)
+        const stale =
+            !fs.existsSync(dest) || fs.statSync(dest).size !== srcStat.size
+        if (stale) {
+            fs.mkdirSync(dir, { recursive: true })
+            fs.copyFileSync(src, dest)
+            replaced = true
+        }
+    } catch {}
+    return { file: dest, replaced }
+}
+
+// 改完快捷方式资源管理器不会自己重画任务栏按钮：只发 UPDATEITEM 或只发
+// ASSOCCHANGED 都不生效，必须两个一起发（实测）。用无窗口的 powershell 发一次。
+function refreshShellIcons(lnks: string[]) {
+    if (process.platform !== "win32" || lnks.length === 0) return
+    const list = lnks.map(p => `'${p.replace(/'/g, "''")}'`).join(",")
+    const script = [
+        "Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;" +
+            'public class FrIconNotify{[DllImport("shell32.dll",CharSet=CharSet.Unicode)]' +
+            "public static extern void SHChangeNotify(int e,uint f,IntPtr a,IntPtr b);}'",
+        `foreach ($p in @(${list})) { $ptr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalUni($p); ` +
+            "[FrIconNotify]::SHChangeNotify(0x2000, 0x5, $ptr, [IntPtr]::Zero); " +
+            "[System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr) }",
+        "[FrIconNotify]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)",
+    ].join("; ")
+    try {
+        const child = spawn(
+            "powershell.exe",
+            [
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+                "-EncodedCommand",
+                Buffer.from(script, "utf16le").toString("base64"),
+            ],
+            { detached: true, stdio: "ignore", windowsHide: true }
+        )
+        child.unref()
+    } catch {}
+}
+
+function samePath(a: string, b: string) {
+    return !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+}
+
+// 只动指向本程序 exe 的固定项，用户自己改过图标的也不覆盖。
+function syncPinnedAppIcon(icon: AppIcon, explicit: boolean) {
+    if (process.platform !== "win32") return
+    const changed: string[] = []
+    try {
+        const folder = pinnedTaskBarFolder()
+        if (!fs.existsSync(folder)) return
+        const orangeIco = path.join(app.getPath("userData"), "icons", APP_ICON_ICO_FILES[AppIcon.Orange])
+        for (const name of fs.readdirSync(folder)) {
+            if (!name.toLowerCase().endsWith(".lnk")) continue
+            const lnk = path.join(folder, name)
+            let link: Electron.ShortcutDetails = null
+            try {
+                link = shell.readShortcutLink(lnk)
+            } catch {
+                continue
+            }
+            if (!samePath(link.target, process.execPath)) continue
+            const managed = samePath(link.icon, orangeIco) || samePath(link.icon, process.execPath) || !link.icon
+            if (!explicit && !managed) continue
+            let want: { icon: string; iconIndex: number }
+            if (icon === AppIcon.Orange) {
+                const prepared = ensureIcoFile(AppIcon.Orange)
+                want = { icon: prepared.file, iconIndex: 0 }
+                // ico 文件本身刚被换成新格式时，快捷方式里的路径没变也要让资源管理器重读
+                if (prepared.replaced) changed.push(lnk)
+            } else {
+                want = { icon: process.execPath, iconIndex: 0 }
+            }
+            if (samePath(link.icon, want.icon) && link.iconIndex === want.iconIndex) continue
+            try {
+                const details: Electron.ShortcutDetails = {
+                    target: link.target,
+                    cwd: link.cwd,
+                    args: link.args,
+                    description: link.description,
+                    icon: want.icon,
+                    iconIndex: want.iconIndex,
+                }
+                if (link.appUserModelId) details.appUserModelId = link.appUserModelId
+                shell.writeShortcutLink(lnk, "update", details)
+                changed.push(lnk)
+            } catch {}
+        }
+    } catch {}
+    refreshShellIcons(changed)
+}
+
 // 建窗时按已存设置套一次，否则默认永远是 exe 里那版。
 export function applyStoredAppIcon(manager: WindowManager) {
-    applyAppIcon(manager, getAppIconSettings())
+    const icon = getAppIconSettings()
+    applyAppIcon(manager, icon)
+    syncPinnedAppIcon(icon, false)
 }
 
 ipcMain.on("get-app-icon", event => {
@@ -220,6 +345,7 @@ ipcMain.handle("set-app-icon", (_, icon: AppIcon) => {
     const value = APP_ICON_FILES[icon] ? icon : AppIcon.Default
     store.set(APP_ICON_STORE_KEY, value)
     applyAppIcon(iconManager, value)
+    syncPinnedAppIcon(value, true)
 })
 export function setAppIconListener(manager: WindowManager) {
     iconManager = manager
